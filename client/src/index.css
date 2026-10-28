@@ -1,0 +1,96 @@
+@import "tailwindcss";
+@import "./theme.css";
+@import "leaflet/dist/leaflet.css";
+
+@layer base {
+  :root {
+    --bg-base: #f8f9fb;
+    --bg-surface: #ffffff;
+    --bg-card: #ffffff;
+    --border-subtle: #d4e0ed;
+    --font-sans: 'Manrope', 'Gilroy', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  body {
+    background-color: #f8f9fb;
+    color: #0b3558;
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Scrollbar sutil e elegante */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f0f3f8;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4e0ed;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a6bbd1;
+}
+
+/* Sombras Calendly normalizadas */
+.shadow-calendly-card {
+  box-shadow: rgba(71, 103, 136, 0.04) 0px 4px 5px 0px, 
+              rgba(71, 103, 136, 0.03) 0px 8px 15px 0px, 
+              rgba(71, 103, 136, 0.08) 0px 20px 40px 0px;
+}
+
+.shadow-calendly-sm {
+  box-shadow: rgba(71, 103, 136, 0.04) 0px 4px 5px 0px, 
+              rgba(71, 103, 136, 0.03) 0px 4px 10px 0px, 
+              rgba(71, 103, 136, 0.05) 0px 8px 16px 0px;
+}
+
+/* Leaflet Light Theme Overrides - Calendly Editorial */
+.leaflet-container {
+  background-color: #f8f9fb !important;
+  font-family: var(--font-sans) !important;
+}
+
+.leaflet-tile {
+  /* Renderização natural e nítida das vias urbanas sem inversão escura */
+  filter: contrast(1.04) saturate(1.1);
+}
+
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: #ffffff !important;
+  color: #0b3558 !important;
+  border: 1px solid #d4e0ed !important;
+  border-radius: 12px !important;
+  box-shadow: rgba(71, 103, 136, 0.08) 0px 10px 30px 0px !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px !important;
+  line-height: 1.4 !important;
+  font-family: var(--font-sans) !important;
+}
+
+/* Radar pulse para os ônibus em tempo real (Signal Blue #006bff) */
+@keyframes radar-ping-blue {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.radar-beacon {
+  animation: radar-ping-blue 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

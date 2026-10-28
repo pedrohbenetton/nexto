@@ -1,0 +1,20 @@
+{
+  "name": "Nexto - Telemetria em Tempo Real",
+  "short_name": "Nexto",
+  "description": "Transporte público ultra-rápido, sem anúncios e com mapa de ônibus ao vivo.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "categories": ["navigation", "transportation", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

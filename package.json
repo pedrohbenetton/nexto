@@ -1,0 +1,32 @@
+{
+  "name": "nexto",
+  "version": "1.0.0",
+  "description": "Nexto: alternativa moderna, ultra-rápida, mobile-first e 100% livre de anúncios para transporte público com decodificação de Protobuf em tempo real.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev:server": "node server/index.js",
+    "dev:client": "cd client && npm run dev",
+    "build:client": "cd client && npm run build",
+    "test:poc": "node scripts/poc_live_cittamobi.js",
+    "test:bff": "node scripts/test_bff_server.js"
+  },
+  "keywords": [
+    "cittamobi",
+    "transit",
+    "reverse-engineering",
+    "protobuf",
+    "realtime",
+    "gtfs",
+    "ad-free"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "protobufjs": "^7.5.5"
+  }
+}

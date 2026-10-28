@@ -1,0 +1,164 @@
+syntax = "proto3";
+
+package br.com.cittamobi.core;
+
+// 1. Cidades
+message CityProto {
+  int32 cityId = 1;
+  string cityName = 2;
+  string stateInitials = 3;
+  string countryName = 4;
+}
+
+message CitiesProto {
+  repeated CityProto cities = 1;
+}
+
+// 2. Busca e Linhas por Cidade
+message LineRoutesServiceSearchProto {
+  string id = 1;
+  string routeCode = 2;
+  string routeMnemonic = 3;
+  string serviceMnemonic = 4;
+  string bgColor = 5;
+  string fgColor = 6;
+  string lineRoutesPath = 7;
+  int32 modal = 8;
+  string companyName = 9;
+  repeated string tags = 10;
+}
+
+message LineRoutesServiceSearchesProto {
+  repeated LineRoutesServiceSearchProto searchResult = 1;
+}
+
+// 3. Previsões em Tempo Real e Posição de Veículos
+message LineRoutesVehiclePredictionProto {
+  string vehicleId = 1;
+  string licensePlate = 2;
+  int32 secondsUntilArrival = 3;
+  int32 minutesUntilArrival = 4;
+  int64 estimatedArrivalTime = 5;
+  int64 scheduledTime = 6;
+  string status = 7;
+  double currentLat = 8;
+  double currentLng = 9;
+  bool isRealTime = 10;
+  int32 sequence = 11;
+}
+
+message ServicePredictionsProto {
+  string routeCode = 1;
+  string routeMnemonic = 2;
+  string serviceMnemonic = 3;
+  string companyId = 4;
+  string stopId = 5;
+  string serviceId = 6;
+  int32 activeVehicles = 7;
+  int32 scheduledVehicles = 8;
+  int32 predictionType = 9;
+  string bgcolor = 10;
+  string fgcolor = 11;
+  repeated LineRoutesVehiclePredictionProto vehicles = 12;
+  bool hasRealTime = 13;
+  int32 estimatedInterval = 14;
+  int32 totalTravelTimeUntilStopSeconds = 15;
+  repeated string tags = 16;
+  string remainingItineraryHash = 17;
+  bool directionUnified = 18;
+}
+
+// 4. Autocomplete de Locais / Paradas
+message PlacesLocationProto {
+  string id = 1;
+  string nome = 2;
+  double lat = 3;
+  double lng = 4;
+  int32 searchtype = 5;
+}
+
+message PlacesSearchProto {
+  repeated PlacesLocationProto places = 2;
+}
+
+// 5. Planejador de Rotas e Itinerários
+message WalkStepDataProto {
+  int64 duration = 1;
+  double distance = 2;
+  string streetname = 3;
+  string relativestate = 4;
+  string absolutedirection = 5;
+  bool isstayon = 6;
+  bool isarea = 7;
+  bool isbogusname = 8;
+  double lon = 9;
+  double lat = 10;
+  int64 elevation = 11;
+}
+
+message LegDataProto {
+  repeated WalkStepDataProto steps = 1;
+  int64 starttime = 2;
+  int64 endtime = 3;
+  double distance = 4;
+  string mode = 5;
+  string route = 6;
+  string headsign = 7;
+  string routeshortname = 8;
+  string routelongname = 9;
+  string color = 10;
+  string textcolor = 11;
+  string stopfromname = 12;
+  double stopfromlat = 13;
+  double stopfromlng = 14;
+  string stoptoname = 15;
+  double stoptolat = 16;
+  double stoptolng = 17;
+  string geometrypoints = 18;
+  int32 geometrylength = 19;
+  repeated string intermediatestopsnames = 20;
+  repeated double intermediatestopslat = 21;
+  repeated double intermediatestopslng = 22;
+  string agencyid = 23;
+  string agencyname = 24;
+}
+
+message ItineraryDataProto {
+  repeated LegDataProto legs = 1;
+  int64 duration = 2;
+  int64 starttime = 3;
+  int64 endtime = 4;
+  double walkdistance = 5;
+  double fare = 6;
+}
+
+message TripPlanDataProto {
+  repeated ItineraryDataProto itineraries = 1;
+  string fromname = 2;
+  double fromlat = 3;
+  double fromlng = 4;
+  string toname = 5;
+  double tolat = 6;
+  double tolng = 7;
+  int64 date = 8;
+  bool haserror = 9;
+  int32 errorid = 10;
+  string errormsg = 11;
+}
+
+message TripPlanDataRequest {
+  double fromLat = 1;
+  double fromLng = 2;
+  double toLat = 3;
+  double toLng = 4;
+  int64 datetime = 5;
+  int32 arriveordepart = 6;
+  double maxwalkdistance = 7;
+  int32 numitineraries = 8;
+  repeated string mode = 9;
+  int32 legacyuserid = 10;
+}
+
+message TripPlanDataResponse {
+  TripPlanDataProto tripplandata = 1;
+}
