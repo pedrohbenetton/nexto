@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiUrl } from '../utils/api';
 import { Search, MapPin, X, Loader2, Globe } from 'lucide-react';
 
 export default function CitySelectorModal({ isOpen, onClose, onSelectCity, currentCity }) {
@@ -23,7 +24,7 @@ export default function CitySelectorModal({ isOpen, onClose, onSelectCity, curre
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/cities?q=${encodeURIComponent(query.trim())}`);
+        const res = await fetch(apiUrl(`/api/cities?q=${encodeURIComponent(query.trim())}`));
         const data = await res.json();
         if (data.success && data.data) {
           setResults(data.data);
@@ -41,7 +42,7 @@ export default function CitySelectorModal({ isOpen, onClose, onSelectCity, curre
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b3558]/35 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-safe-4 bg-[#0b3558]/35 backdrop-blur-sm animate-fade-in">
       <div className="relative w-full max-w-md bg-[#ffffff] border border-[#d4e0ed] rounded-[24px] shadow-calendly-card overflow-hidden flex flex-col max-h-[85vh]">
         
         {/* Header */}

@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { apiUrl } from '../utils/api';
+import { getCurrentPosition } from '../utils/geolocation';
 import L from 'leaflet';
 import { 
   X, RefreshCw, Radio, Navigation, Eye, MapPin, Bus, 
@@ -45,7 +47,7 @@ export default function MapView({ line, details, selectedStop, onClose }) {
     if (!currentLine?.lineRoutesPath) return;
     if (showLoader) setLoading(true);
     try {
-      const res = await fetch(`/api/lines/tracking?path=${encodeURIComponent(currentLine.lineRoutesPath)}&serviceId=${details?.serviceId || ''}`);
+      const res = await fetch(apiUrl(`/api/lines/tracking?path=${encodeURIComponent(currentLine.lineRoutesPath)}&serviceId=${details?.serviceId || ''}`));
       const json = await res.json();
       if (json.success && json.data) {
         setTrackingData(json.data);
@@ -140,19 +142,11 @@ export default function MapView({ line, details, selectedStop, onClose }) {
 
   // 5. Geolocalização do Usuário
   const handleLocateUser = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocalização não suportada no seu navegador.');
-      return;
-    }
-
     setLocatingUser(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
+    getCurrentPosition().then(
+      ({ lat, lng }) => {
         setLocatingUser(false);
-        const coords = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        };
+        const coords = { lat, lng };
         setUserLocation(coords);
 
         if (userLayerRef.current && mapInstanceRef.current) {
@@ -191,9 +185,10 @@ export default function MapView({ line, details, selectedStop, onClose }) {
       (err) => {
         setLocatingUser(false);
         console.warn('Erro ao obter GPS do usuário:', err);
-        alert('Não foi possível obter sua localização. Verifique as permissões de GPS.');
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
+        alert(err.code === 'UNSUPPORTED'
+          ? 'Geolocalização não suportada neste dispositivo.'
+          : 'Não foi possível obter sua localização. Verifique as permissões de GPS.');
+      }
     );
   };
 
@@ -373,7 +368,7 @@ export default function MapView({ line, details, selectedStop, onClose }) {
     <div className="fixed inset-0 z-50 flex flex-col bg-[#f8f9fb] text-[#0b3558] animate-fade-in">
       
       {/* Top Telemetry Header (À Esquerda) */}
-      <div className="absolute top-4 left-4 z-[2000] pointer-events-none">
+      <div className="absolute top-safe-4 left-4 z-[2000] pointer-events-none">
         <div className="pointer-events-auto bg-[#ffffff]/95 backdrop-blur-md border border-[#d4e0ed] rounded-[16px] p-3 shadow-calendly-card flex items-center gap-3">
           <div className="px-2.5 py-1.5 rounded-[8px] bg-[#f0f3f8] border border-[#d4e0ed] text-[#006bff] font-bold text-sm">
             {currentLine?.routeCode || 'BUS'}
@@ -409,7 +404,7 @@ export default function MapView({ line, details, selectedStop, onClose }) {
       </div>
 
       {/* Top Right Controls (Isolados e sem colisão com o zoom do mapa) */}
-      <div className="absolute top-4 right-4 z-[2000] flex items-center gap-2 pointer-events-auto">
+      <div className="absolute top-safe-4 right-4 z-[2000] flex items-center gap-2 pointer-events-auto">
         {/* Botão de Localização do Usuário */}
         <button
           onClick={handleLocateUser}
@@ -451,7 +446,7 @@ export default function MapView({ line, details, selectedStop, onClose }) {
       <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Floating Bottom Telemetry Dock */}
-      <div className="absolute bottom-4 left-4 right-4 md:left-4 md:right-auto md:w-96 z-[2000] pointer-events-none">
+      <div className="absolute bottom-safe-4 left-4 right-4 md:left-4 md:right-auto md:w-96 z-[2000] pointer-events-none">
         <div className="pointer-events-auto bg-[#ffffff]/95 backdrop-blur-md border border-[#d4e0ed] rounded-[16px] p-3.5 shadow-calendly-card space-y-2.5">
           
           <div className="flex items-center justify-between border-b border-[#d4e0ed] pb-2 text-xs">

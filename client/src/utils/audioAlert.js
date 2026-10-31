@@ -1,3 +1,5 @@
+import { vibrateArrival } from './haptics';
+
 // Sintetizador de Áudio e Notificações Táticas (Web Audio API - Sem arquivos externos)
 class TransitAlarmSystem {
   constructor() {
@@ -74,10 +76,8 @@ class TransitAlarmSystem {
     // 1. Tocar sinal sonoro
     this.playArrivalChime();
 
-    // 2. Vibrar dispositivo móvel
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      navigator.vibrate([200, 100, 200, 100, 400]);
-    }
+    // 2. Vibrar dispositivo móvel (háptico nativo no app, Vibration API na web)
+    vibrateArrival();
 
     // 3. Notificação do Sistema
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {

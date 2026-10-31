@@ -20,7 +20,9 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
+      // No app nativo (Capacitor) os assets já vêm empacotados: sem SW para não servir cache antigo
+      const isNativeApp = window.Capacitor?.isNativePlatform?.() === true;
+      if ('serviceWorker' in navigator && !isNativeApp) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').then(
             (reg) => console.log('// PWA Service Worker Ativo:', reg.scope),

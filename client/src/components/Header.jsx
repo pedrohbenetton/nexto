@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { apiUrl } from '../utils/api';
+import { getCurrentPosition } from '../utils/geolocation';
 import { MapPin, Star, Search, Cpu, Download, Crosshair, Radio, ShieldCheck } from 'lucide-react';
 
 export default function Header({ 
@@ -31,17 +33,11 @@ export default function Header({
 
   // Auto-detectar município via GPS
   const handleDetectCity = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocalização não suportada no seu navegador.');
-      return;
-    }
     setDetectingGps(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+    getCurrentPosition({ enableHighAccuracy: false, timeout: 7000 }).then(
+      async ({ lat, lng }) => {
         try {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const res = await fetch(`/api/cities/detect?lat=${lat}&lng=${lng}`);
+          const res = await fetch(apiUrl(`/api/cities/detect?lat=${lat}&lng=${lng}`));
           const json = await res.json();
           if (json.success && json.data) {
             const parts = (json.data.name || '').split('-');
@@ -64,14 +60,14 @@ export default function Header({
       },
       (err) => {
         setDetectingGps(false);
+        if (err.code === 'UNSUPPORTED') alert('Geolocalização não suportada neste dispositivo.');
         console.warn('Erro de GPS:', err);
-      },
-      { timeout: 7000 }
+      }
     );
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#d4e0ed] shadow-calendly-sm">
+    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#d4e0ed] shadow-calendly-sm pt-safe">
       {/* Telemetria Ticker Superior */}
       <div className="bg-[#f0f3f8] border-b border-[#d4e0ed] px-4 py-1.5 text-[11px] font-medium text-[#476788] flex items-center justify-between overflow-x-auto whitespace-nowrap">
         <div className="flex items-center gap-3">

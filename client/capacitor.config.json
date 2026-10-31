@@ -1,0 +1,19 @@
+{
+  "appId": "com.nexto.transit",
+  "appName": "Nexto",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "LIGHT",
+      "backgroundColor": "#f8f9fb"
+    }
+  }
+}

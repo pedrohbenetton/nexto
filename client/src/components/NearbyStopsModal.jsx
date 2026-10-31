@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { apiUrl } from '../utils/api';
+import { getCurrentPosition } from '../utils/geolocation';
 import { X, Navigation, MapPin, Footprints, Clock, RefreshCw, AlertCircle } from 'lucide-react';
 import { StopListSkeleton } from './Skeleton';
 
@@ -9,21 +11,15 @@ export default function NearbyStopsModal({ isOpen, onClose, onSelectStop }) {
   const [userCoords, setUserCoords] = useState(null);
 
   const fetchNearby = () => {
-    if (!navigator.geolocation) {
-      setError('Geolocalização não suportada neste dispositivo.');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
+    getCurrentPosition().then(
+      async ({ lat: latitude, lng: longitude }) => {
         setUserCoords({ lat: latitude, lng: longitude });
 
         try {
-          const res = await fetch(`/api/stops/nearby?lat=${latitude}&lng=${longitude}&radius=3000&limit=12`);
+          const res = await fetch(apiUrl(`/api/stops/nearby?lat=${latitude}&lng=${longitude}&radius=3000&limit=12`));
           const json = await res.json();
           if (json.success) {
             setStops(json.data || []);
@@ -41,9 +37,10 @@ export default function NearbyStopsModal({ isOpen, onClose, onSelectStop }) {
       },
       (err) => {
         setLoading(false);
-        setError('Permissão de GPS negada ou sinal indisponível.');
-      },
-      { timeout: 8000, enableHighAccuracy: true }
+        setError(err.code === 'UNSUPPORTED'
+          ? 'Geolocalização não suportada neste dispositivo.'
+          : 'Permissão de GPS negada ou sinal indisponível.');
+      }
     );
   };
 
@@ -56,7 +53,7 @@ export default function NearbyStopsModal({ isOpen, onClose, onSelectStop }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b3558]/35 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-safe-4 bg-[#0b3558]/35 backdrop-blur-sm animate-fade-in">
       <div className="w-full max-w-lg bg-[#ffffff] border border-[#d4e0ed] rounded-[24px] shadow-calendly-card flex flex-col max-h-[85vh] overflow-hidden">
         
         {/* Header Modal */}

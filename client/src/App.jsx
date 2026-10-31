@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { apiUrl } from './utils/api';
 import Header from './components/Header';
 import LineCard from './components/LineCard';
 import LineDetailDrawer from './components/LineDetailDrawer';
@@ -104,7 +105,7 @@ export default function App() {
       setLoadingLines(true);
       setLinesError(null);
       try {
-        const res = await fetch(`/api/cities/${currentCity.cityId}/lines`);
+        const res = await fetch(apiUrl(`/api/cities/${currentCity.cityId}/lines`));
         const data = await res.json();
         if (isMounted) {
           if (data.success && data.data) {

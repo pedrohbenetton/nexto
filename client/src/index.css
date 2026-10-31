@@ -10,6 +10,13 @@
     --border-subtle: #d4e0ed;
     --font-sans: 'Manrope', 'Gilroy', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+    /* Safe areas (notch, status bar e barra de navegação). env() exige viewport-fit=cover no index.html;
+       --safe-area-inset-* é injetado pelo Capacitor em WebViews Android que não reportam env(). */
+    --safe-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+    --safe-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+    --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+    --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
   }
 
   body {
@@ -18,7 +25,32 @@
     font-family: var(--font-sans);
     overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
   }
+}
+
+/* Utilitários de safe area */
+@utility pt-safe {
+  padding-top: var(--safe-top);
+}
+
+@utility pb-safe {
+  padding-bottom: var(--safe-bottom);
+}
+
+/* Overlays fixos: mantém 1rem de respiro e cresce com o inset */
+@utility p-safe-4 {
+  padding: max(1rem, var(--safe-top)) max(1rem, var(--safe-right)) max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left));
+}
+
+/* Elementos flutuantes ancorados a 1rem da borda */
+@utility top-safe-4 {
+  top: calc(1rem + var(--safe-top));
+}
+
+@utility bottom-safe-4 {
+  bottom: calc(1rem + var(--safe-bottom));
 }
 
 /* Scrollbar sutil e elegante */

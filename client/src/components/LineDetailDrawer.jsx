@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { apiUrl } from '../utils/api';
 import { 
   X, Radio, Clock, MapPin, RefreshCw, Bus, AlertCircle, 
   Map, CheckCircle2, Navigation, Activity, Bell, BellRing, 
   ArrowLeftRight, Users, Sparkles
 } from 'lucide-react';
 import { transitAlarm } from '../utils/audioAlert';
+import { tapFeedback } from '../utils/haptics';
 import { LineDetailSkeleton, PredictionSkeleton } from './Skeleton';
 
 export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35 }) {
@@ -32,7 +34,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
     async function fetchPaired() {
       if (!activeLine?.routeCode) return;
       try {
-        const res = await fetch(`/api/lines/paired?routeCode=${encodeURIComponent(activeLine.routeCode)}&cityId=${cityId}`);
+        const res = await fetch(apiUrl(`/api/lines/paired?routeCode=${encodeURIComponent(activeLine.routeCode)}&cityId=${cityId}`));
         const json = await res.json();
         if (isMounted && json.success && json.data) {
           setPairedLines(json.data);
@@ -53,7 +55,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/lines/details?path=${encodeURIComponent(activeLine.lineRoutesPath)}`);
+        const res = await fetch(apiUrl(`/api/lines/details?path=${encodeURIComponent(activeLine.lineRoutesPath)}`));
         const json = await res.json();
         if (isMounted) {
           if (json.success && json.data) {
@@ -80,7 +82,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
     if (!details?.serviceId || !stop?.stopId) return;
     if (showLoader) setPredLoading(true);
     try {
-      const res = await fetch(`/api/predictions?serviceId=${encodeURIComponent(details.serviceId)}&stopId=${encodeURIComponent(stop.stopId)}`);
+      const res = await fetch(apiUrl(`/api/predictions?serviceId=${encodeURIComponent(details.serviceId)}&stopId=${encodeURIComponent(stop.stopId)}`));
       const json = await res.json();
       if (json.success && json.data) {
         setPredictions(json.data);
@@ -104,7 +106,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
         if (json.data.vehicles && json.data.vehicles.length > 0) {
           json.data.vehicles.forEach(async (v) => {
             try {
-              const cRes = await fetch(`/api/crowding/${v.vehicleId}`);
+              const cRes = await fetch(apiUrl(`/api/crowding/${v.vehicleId}`));
               const cJson = await cRes.json();
               if (cJson.success && cJson.data) {
                 setCrowdingData(prev => ({ ...prev, [v.vehicleId]: cJson.data }));
@@ -146,6 +148,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
     // Solicitar permissão de áudio / notificação
     await transitAlarm.requestNotificationPermission();
     transitAlarm.playArrivalChime(); // Toca breve tom de confirmação
+    tapFeedback();
     setAlarmTarget(vehicleId);
     setAlarmTriggered(false);
   };
@@ -153,7 +156,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
   // Reportar Lotação Colaborativa
   const handleVoteCrowding = async (vehicleId, level) => {
     try {
-      const res = await fetch('/api/crowding/report', {
+      const res = await fetch(apiUrl('/api/crowding/report'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vehicleId, level })
@@ -168,8 +171,8 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-center bg-[#0b3558]/40 backdrop-blur-sm animate-fade-in p-0 md:p-6">
-      <div className="w-full md:max-w-2xl bg-[#ffffff] border-t md:border border-[#d4e0ed] rounded-t-[24px] md:rounded-[24px] shadow-calendly-card flex flex-col max-h-[92vh] md:max-h-[85vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-center bg-[#0b3558]/40 backdrop-blur-sm animate-fade-in pt-safe md:p-6">
+      <div className="w-full md:max-w-2xl bg-[#ffffff] border-t md:border border-[#d4e0ed] rounded-t-[24px] md:rounded-[24px] shadow-calendly-card flex flex-col max-h-[92vh] md:max-h-[85vh] overflow-hidden pb-safe md:pb-0">
         
         {/* Header Drawer */}
         <div className="p-4 sm:p-5 border-b border-[#d4e0ed] bg-[#ffffff] flex items-center justify-between gap-3">
