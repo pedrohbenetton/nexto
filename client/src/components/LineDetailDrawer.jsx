@@ -5,6 +5,7 @@ import {
   ArrowLeftRight, Users, Sparkles
 } from 'lucide-react';
 import { transitAlarm } from '../utils/audioAlert';
+import { LineDetailSkeleton, PredictionSkeleton } from './Skeleton';
 
 export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35 }) {
   const [activeLine, setActiveLine] = useState(line);
@@ -270,10 +271,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
           
           {loading ? (
-            <div className="py-16 flex flex-col items-center justify-center text-[#476788] space-y-2">
-              <RefreshCw className="w-6 h-6 animate-spin text-[#006bff]" />
-              <p className="text-xs font-medium">Carregando itinerário e paradas...</p>
-            </div>
+            <LineDetailSkeleton />
           ) : error ? (
             <div className="p-4 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500" />
@@ -317,10 +315,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
                     </div>
 
                     {predLoading ? (
-                      <div className="py-4 text-center text-xs text-[#476788]">
-                        <RefreshCw className="w-4 h-4 animate-spin text-[#006bff] mx-auto mb-1" />
-                        <span>Consultando telemetria ao vivo...</span>
-                      </div>
+                      <PredictionSkeleton count={2} />
                     ) : predictions?.vehicles && predictions.vehicles.length > 0 ? (
                       <div className="space-y-2.5">
                         {predictions.vehicles.map((v, idx) => {

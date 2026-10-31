@@ -50,6 +50,29 @@
               rgba(71, 103, 136, 0.05) 0px 8px 16px 0px;
 }
 
+/* Skeleton shimmer (Pebble #f0f3f8 com onda #e7edf6) */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.skeleton {
+  background-color: #f0f3f8;
+  background-image: linear-gradient(90deg, #f0f3f8 0%, #e7edf6 50%, #f0f3f8 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
 /* Leaflet Light Theme Overrides - Calendly Editorial */
 .leaflet-container {
   background-color: #f8f9fb !important;

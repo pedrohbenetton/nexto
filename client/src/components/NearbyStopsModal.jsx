@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Navigation, MapPin, Footprints, Clock, RefreshCw, AlertCircle } from 'lucide-react';
+import { StopListSkeleton } from './Skeleton';
 
 export default function NearbyStopsModal({ isOpen, onClose, onSelectStop }) {
   const [stops, setStops] = useState([]);
@@ -103,10 +104,7 @@ export default function NearbyStopsModal({ isOpen, onClose, onSelectStop }) {
         {/* List Content */}
         <div className="p-4 overflow-y-auto space-y-2 flex-1 divide-y divide-[#f0f3f8]">
           {loading && (
-            <div className="py-12 flex flex-col items-center justify-center text-[#476788] text-sm gap-3">
-              <RefreshCw className="w-6 h-6 animate-spin text-[#006bff]" />
-              <span>Calculando paradas próximas da sua localização...</span>
-            </div>
+            <StopListSkeleton count={6} label="Calculando paradas próximas da sua localização..." />
           )}
 
           {!loading && error && (

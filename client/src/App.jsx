@@ -5,7 +5,11 @@ import LineDetailDrawer from './components/LineDetailDrawer';
 import MapView from './components/MapView';
 import CitySelectorModal from './components/CitySelectorModal';
 import NearbyStopsModal from './components/NearbyStopsModal';
-import { RefreshCw, AlertCircle, Terminal, Radio, Clock, History, Compass } from 'lucide-react';
+import FilterPills from './components/FilterPills';
+import EmptyState from './components/EmptyState';
+import { LineListSkeleton } from './components/Skeleton';
+import { LINE_FILTERS, lineId, filterLines, countByFilter } from './utils/lineFilters';
+import { AlertCircle, Radio, History, SearchX, Star, Route, MapPinOff } from 'lucide-react';
 
 export default function App() {
   // Estado da Cidade Ativa (padrão: Sorocaba - SP)
@@ -25,7 +29,7 @@ export default function App() {
 
   // Busca e Filtros
   const [searchTerm, setSearchTerm] = useState('');
-  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
 
   // Favoritos persistidos
   const [favorites, setFavorites] = useState(() => {
@@ -143,22 +147,60 @@ export default function App() {
     });
   };
 
-  // Filtragem rápida em memória
-  const filteredLines = useMemo(() => {
-    let list = lines;
-    if (showOnlyFavorites) {
-      list = list.filter(l => favorites.includes(l.id || l.routeCode));
-    }
-    if (!searchTerm.trim()) return list;
+  // Filtragem rápida em memória (categoria + busca)
+  const filteredLines = useMemo(
+    () => filterLines(lines, { filter: activeFilter, searchTerm, favorites }),
+    [lines, searchTerm, activeFilter, favorites]
+  );
 
-    const term = searchTerm.toLowerCase().trim();
-    return list.filter(l => 
-      (l.routeCode && l.routeCode.toLowerCase().includes(term)) ||
-      (l.routeMnemonic && l.routeMnemonic.toLowerCase().includes(term)) ||
-      (l.serviceMnemonic && l.serviceMnemonic.toLowerCase().includes(term)) ||
-      (l.companyName && l.companyName.toLowerCase().includes(term))
-    );
-  }, [lines, searchTerm, showOnlyFavorites, favorites]);
+  const filterCounts = useMemo(
+    () => countByFilter(lines, { searchTerm, favorites }),
+    [lines, searchTerm, favorites]
+  );
+
+  const showOnlyFavorites = activeFilter === 'favorites';
+  const hasSearch = searchTerm.trim().length > 0;
+  const activeFilterLabel = LINE_FILTERS.find(f => f.id === activeFilter)?.label;
+
+  // Conteúdo do estado vazio conforme o motivo
+  const emptyState = (() => {
+    const showAll = { label: 'Ver todas as linhas', onClick: () => setActiveFilter('all') };
+    const clearSearch = { label: 'Limpar busca', onClick: () => setSearchTerm(''), primary: true };
+
+    if (lines.length === 0) {
+      return {
+        icon: MapPinOff,
+        title: `Nenhuma linha em ${currentCity?.cityName || 'esta cidade'}`,
+        description: 'Ainda não há linhas publicadas para esta cidade.',
+        actions: [{ label: 'Trocar cidade', onClick: () => setIsCityModalOpen(true), primary: true }]
+      };
+    }
+    if (hasSearch) {
+      const elsewhere = activeFilter !== 'all' && filterCounts.all > 0;
+      return {
+        icon: SearchX,
+        title: `Nada encontrado para "${searchTerm.trim()}"`,
+        description: elsewhere
+          ? `Nenhum resultado em ${activeFilterLabel}, mas há ${filterCounts.all} em outras categorias.`
+          : 'Confira o número da linha ou tente o nome de um bairro ou terminal.',
+        actions: elsewhere ? [clearSearch, { ...showAll, label: 'Buscar em todas' }] : [clearSearch]
+      };
+    }
+    if (showOnlyFavorites) {
+      return {
+        icon: Star,
+        title: 'Você ainda não tem favoritos',
+        description: 'Toque na estrela de uma linha para encontrá-la aqui rapidamente, mesmo offline.',
+        actions: [{ ...showAll, primary: true }]
+      };
+    }
+    return {
+      icon: Route,
+      title: `Nenhuma linha em ${activeFilterLabel}`,
+      description: 'Esta categoria não tem linhas nesta cidade.',
+      actions: [{ ...showAll, primary: true }]
+    };
+  })();
 
   return (
     <div className="relative min-h-screen bg-[#f8f9fb] text-[#0b3558] flex flex-col font-sans overflow-x-hidden selection:bg-[#006bff] selection:text-white">
@@ -173,7 +215,7 @@ export default function App() {
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         showOnlyFavorites={showOnlyFavorites}
-        onToggleOnlyFavorites={() => setShowOnlyFavorites(prev => !prev)}
+        onToggleOnlyFavorites={() => setActiveFilter(prev => (prev === 'favorites' ? 'all' : 'favorites'))}
         favoritesCount={favorites.length}
         totalLinesCount={lines.length}
         installPrompt={installPrompt}
@@ -207,7 +249,7 @@ export default function App() {
         </div>
 
         {/* Linhas Acessadas Recentemente */}
-        {!searchTerm && recentLines.length > 0 && !showOnlyFavorites && (
+        {!searchTerm && recentLines.length > 0 && activeFilter === 'all' && (
           <div className="space-y-2 pt-1 pb-2">
             <div className="flex items-center justify-between text-xs text-[#476788] font-semibold px-1">
               <span className="flex items-center gap-1.5">
@@ -241,11 +283,13 @@ export default function App() {
         )}
 
         {/* Lista de Linhas */}
+        {/* Filtros de Categoria (pills) */}
+        {!loadingLines && !linesError && lines.length > 0 && (
+          <FilterPills activeFilter={activeFilter} counts={filterCounts} onChange={setActiveFilter} />
+        )}
+
         {loadingLines ? (
-          <div className="py-24 flex flex-col items-center justify-center text-[#476788] space-y-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-[#006bff]" />
-            <p className="text-sm font-medium">Carregando catálogo e posições em tempo real...</p>
-          </div>
+          <LineListSkeleton count={6} />
         ) : linesError ? (
           <div className="py-16 text-center space-y-3 p-8 rounded-[24px] bg-[#ffffff] border border-red-200 shadow-calendly-sm">
             <AlertCircle className="w-8 h-8 mx-auto text-red-500" />
@@ -260,11 +304,11 @@ export default function App() {
         ) : filteredLines.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {filteredLines.map(line => {
-              const lineId = line.id || line.routeCode;
-              const isFav = favorites.includes(lineId);
+              const id = lineId(line);
+              const isFav = favorites.includes(id);
               return (
                 <LineCard
-                  key={lineId}
+                  key={id}
                   line={line}
                   isFavorite={isFav}
                   onToggleFavorite={handleToggleFavorite}
@@ -274,29 +318,7 @@ export default function App() {
             })}
           </div>
         ) : (
-          <div className="py-20 text-center space-y-3 p-8 rounded-[24px] bg-[#ffffff] border border-[#d4e0ed] shadow-calendly-sm">
-            <Compass className="w-8 h-8 mx-auto text-[#a6bbd1]" />
-            <p className="text-sm font-semibold text-[#0b3558]">
-              {showOnlyFavorites 
-                ? 'Nenhuma rota registrada em favoritos ainda.' 
-                : `Nenhuma rota localizada para "${searchTerm}".`}
-            </p>
-            {showOnlyFavorites ? (
-              <button
-                onClick={() => setShowOnlyFavorites(false)}
-                className="px-4 py-2 rounded-[8px] bg-[#006bff] hover:bg-[#005ce6] text-white text-xs font-semibold transition-all shadow-sm"
-              >
-                Ver Todas as Rotas
-              </button>
-            ) : (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="px-4 py-2 rounded-[8px] bg-[#f0f3f8] hover:bg-[#e6f0ff] text-[#0b3558] border border-[#d4e0ed] text-xs font-semibold transition-all"
-              >
-                Limpar Busca
-              </button>
-            )}
-          </div>
+          <EmptyState {...emptyState} />
         )}
       </main>
 
