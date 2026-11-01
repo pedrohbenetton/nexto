@@ -10,7 +10,9 @@ import FilterPills from './components/FilterPills';
 import EmptyState from './components/EmptyState';
 import { LineListSkeleton } from './components/Skeleton';
 import { LINE_FILTERS, lineId, filterLines, countByFilter } from './utils/lineFilters';
-import { AlertCircle, History, SearchX, Star, Route, MapPinOff } from 'lucide-react';
+import { AlertCircle, History, SearchX, Star, Route, MapPinOff, Bookmark } from 'lucide-react';
+import MyStops from './components/MyStops';
+import { toggleSavedStop } from './utils/savedStops';
 import LinePlate from './components/LinePlate';
 import BottomNav from './components/BottomNav';
 
@@ -56,6 +58,7 @@ export default function App() {
 
   // Modais e Visualizadores
   const [selectedLine, setSelectedLine] = useState(null);
+  const [selectedStopId, setSelectedStopId] = useState(null);
   const [mapData, setMapData] = useState(null);
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [isNearbyModalOpen, setIsNearbyModalOpen] = useState(false);
@@ -99,6 +102,22 @@ export default function App() {
     localStorage.setItem('citta_recent_lines', JSON.stringify(recentLines));
   }, [recentLines]);
 
+  // Meus pontos (linha + parada) persistidos
+  const [savedStops, setSavedStops] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nexto_saved_stops');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('nexto_saved_stops', JSON.stringify(savedStops));
+  }, [savedStops]);
+
+  const handleToggleSavedStop = (entry) => setSavedStops(prev => toggleSavedStop(prev, entry));
+
   // Carregar linhas quando a cidade mudar
   useEffect(() => {
     let isMounted = true;
@@ -129,8 +148,9 @@ export default function App() {
   }, [currentCity]);
 
   // Registrar em Recentes ao abrir linha
-  const handleSelectLine = (line) => {
+  const handleSelectLine = (line, stopId = null) => {
     setSelectedLine(line);
+    setSelectedStopId(stopId);
     setRecentLines(prev => {
       const filtered = prev.filter(l => (l.lineRoutesPath || l.id) !== (line.lineRoutesPath || line.id));
       return [line, ...filtered].slice(0, 5); // Mantém os 5 mais recentes
@@ -230,8 +250,20 @@ export default function App() {
 
       <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 sm:px-6 pt-5 sm:pt-8 pb-tabbar md:pb-12 space-y-6">
 
-        {/* Hero */}
-        {!hasSearch && activeFilter === 'all' && (
+        {/* Meus pontos: quem já salvou pontos abre o app direto nos próximos ônibus */}
+        {!hasSearch && activeFilter === 'all' && savedStops.length > 0 && (
+          <MyStops
+            savedStops={savedStops}
+            onOpen={(entry) => handleSelectLine(
+              lines.find(l => l.lineRoutesPath === entry.line.lineRoutesPath) || entry.line,
+              entry.stopId
+            )}
+            onRemove={handleToggleSavedStop}
+          />
+        )}
+
+        {/* Hero (primeiro uso, ainda sem pontos salvos) */}
+        {!hasSearch && activeFilter === 'all' && savedStops.length === 0 && (
           <section className="relative overflow-hidden rounded-[28px] bg-[#0e1116] text-white dark:bg-surface dark:border dark:border-line px-5 py-6 sm:px-8 sm:py-9">
             <div aria-hidden="true" className="absolute -right-14 -top-14 w-32 h-32 sm:-right-10 sm:-top-16 sm:w-56 sm:h-56 rounded-full bg-brand" />
             <div aria-hidden="true" className="absolute -right-6 -bottom-12 w-24 h-24 sm:right-16 sm:bottom-[-70px] sm:w-40 sm:h-40 rounded-full bg-signal" />
@@ -246,6 +278,10 @@ export default function App() {
                 {loadingLines
                   ? 'Carregando linhas da cidade...'
                   : `${lines.length} linhas com ônibus em tempo real. Sem anúncios, sempre.`}
+              </p>
+              <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/85">
+                <Bookmark className="w-3.5 h-3.5 flex-shrink-0 text-brand" />
+                <span>Abra uma linha e toque em <strong className="text-white">Salvar ponto</strong></span>
               </p>
             </div>
           </section>
@@ -347,6 +383,9 @@ export default function App() {
       {selectedLine && (
         <LineDetailDrawer
           line={selectedLine}
+          initialStopId={selectedStopId}
+          savedStops={savedStops}
+          onToggleSavedStop={handleToggleSavedStop}
           cityId={currentCity?.cityId || 35}
           onClose={() => setSelectedLine(null)}
           onOpenMap={(details, selectedStop, activeLine) => {

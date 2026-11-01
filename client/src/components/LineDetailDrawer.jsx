@@ -3,14 +3,17 @@ import { apiUrl } from '../utils/api';
 import { 
   X, Radio, Clock, MapPin, RefreshCw, Bus, AlertCircle, 
   Map, CheckCircle2, Navigation, Activity, Bell, BellRing, 
-  ArrowLeftRight, Users, Sparkles
+  ArrowLeftRight, Users, Sparkles, Bookmark
 } from 'lucide-react';
 import { transitAlarm } from '../utils/audioAlert';
 import { tapFeedback } from '../utils/haptics';
+import { isStopSaved, toSavedStop } from '../utils/savedStops';
 import { LineDetailSkeleton, PredictionSkeleton } from './Skeleton';
 import LinePlate from './LinePlate';
 
-export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35 }) {
+export default function LineDetailDrawer({
+  line, onClose, onOpenMap, cityId = 35, initialStopId, savedStops = [], onToggleSavedStop
+}) {
   const [activeLine, setActiveLine] = useState(line);
   const [pairedLines, setPairedLines] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +65,8 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
           if (json.success && json.data) {
             setDetails(json.data);
             if (json.data.stops && json.data.stops.length > 0) {
-              setSelectedStop(json.data.stops[0]);
+              const initial = initialStopId && json.data.stops.find(s => s.stopId === initialStopId);
+              setSelectedStop(initial || json.data.stops[0]);
             }
           } else {
             setError('Falha ao sincronizar o itinerário da linha.');
@@ -295,13 +299,35 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
                       <p className="text-[11px] text-muted mt-0.5">Identificador: {selectedStop.stopId}</p>
                     </div>
 
-                    <button
-                      onClick={() => onOpenMap(details, selectedStop, activeLine)}
-                      className="px-3 py-1.5 rounded-[12px] bg-surface hover:bg-surface-2 border border-line text-xs font-semibold text-accent flex items-center gap-1.5 shadow-sm transition-all flex-shrink-0"
-                    >
-                      <Map className="w-3.5 h-3.5 text-accent" />
-                      <span>Ver no Mapa</span>
-                    </button>
+                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                      {onToggleSavedStop && details?.serviceId && (() => {
+                        const saved = isStopSaved(savedStops, details.serviceId, selectedStop.stopId);
+                        return (
+                          <button
+                            onClick={() => {
+                              onToggleSavedStop(toSavedStop(activeLine, details, selectedStop));
+                              tapFeedback();
+                            }}
+                            aria-pressed={saved}
+                            className={`h-9 px-3.5 rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                              saved
+                                ? 'bg-brand text-on-brand'
+                                : 'bg-surface border border-line hover:border-line-strong text-ink'
+                            }`}
+                          >
+                            <Bookmark className={`w-3.5 h-3.5 ${saved ? 'fill-current' : ''}`} />
+                            <span>{saved ? 'Ponto salvo' : 'Salvar ponto'}</span>
+                          </button>
+                        );
+                      })()}
+                      <button
+                        onClick={() => onOpenMap(details, selectedStop, activeLine)}
+                        className="h-9 px-3.5 rounded-full bg-surface hover:bg-surface-2 border border-line text-xs font-semibold text-ink flex items-center gap-1.5 whitespace-nowrap transition-colors"
+                      >
+                        <Map className="w-3.5 h-3.5" />
+                        <span>Ver no mapa</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Veículos em Aproximação */}
@@ -400,6 +426,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
                                     </>
                                   )}
                                 </button>
+
 
                                 {/* Votação de Lotação */}
                                 <div className="flex items-center gap-1 text-[11px]">
