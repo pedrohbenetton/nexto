@@ -14,6 +14,7 @@ import { AlertCircle, History, SearchX, Star, Route, MapPinOff, Bookmark } from 
 import MyStops from './components/MyStops';
 import { toggleSavedStop } from './utils/savedStops';
 import { parseShareParams } from './utils/shareTripCore';
+import AlightAlert from './components/AlightAlert';
 import LinePlate from './components/LinePlate';
 import BottomNav from './components/BottomNav';
 
@@ -134,6 +135,26 @@ export default function App() {
   }, [savedStops]);
 
   const handleToggleSavedStop = (entry) => setSavedStops(prev => toggleSavedStop(prev, entry));
+
+  // Alerta de descida: as coordenadas das paradas vêm do endpoint de rastreamento
+  const [alight, setAlight] = useState(null);
+
+  const handleStartAlight = async ({ line, serviceId, stop }) => {
+    try {
+      const res = await fetch(apiUrl(
+        `/api/lines/tracking?path=${encodeURIComponent(line.lineRoutesPath)}&serviceId=${encodeURIComponent(serviceId || '')}&cityId=${currentCity?.cityId || 35}`
+      ));
+      const json = await res.json();
+      const located = json.data?.stops?.find(s => s.stopId === stop.stopId);
+      if (typeof located?.lat !== 'number' || typeof located?.lng !== 'number') {
+        alert('Ainda não temos a localização exata deste ponto. Tente outro ponto da linha.');
+        return;
+      }
+      setAlight({ line, stop: { stopId: stop.stopId, name: stop.name, lat: located.lat, lng: located.lng } });
+    } catch {
+      alert('Não foi possível ativar o aviso agora. Verifique sua conexão.');
+    }
+  };
 
   // Carregar linhas quando a cidade mudar
   useEffect(() => {
@@ -403,6 +424,8 @@ export default function App() {
           initialStopId={selectedStopId}
           savedStops={savedStops}
           onToggleSavedStop={handleToggleSavedStop}
+          onStartAlight={handleStartAlight}
+          alightStopId={alight?.stop.stopId}
           cityId={currentCity?.cityId || 35}
           onClose={() => setSelectedLine(null)}
           onOpenMap={(details, selectedStop, activeLine) => {
@@ -422,6 +445,9 @@ export default function App() {
           onClose={() => setMapData(null)}
         />
       )}
+
+      {/* Aviso de descida (acompanha o GPS mesmo com o drawer fechado) */}
+      {alight && <AlightAlert target={alight} onCancel={() => setAlight(null)} />}
 
       {/* Modal de Paradas Próximas via GPS */}
       <NearbyStopsModal

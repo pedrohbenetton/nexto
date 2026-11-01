@@ -13,7 +13,8 @@ import { LineDetailSkeleton, PredictionSkeleton } from './Skeleton';
 import LinePlate from './LinePlate';
 
 export default function LineDetailDrawer({
-  line, onClose, onOpenMap, cityId = 35, initialStopId, savedStops = [], onToggleSavedStop
+  line, onClose, onOpenMap, cityId = 35, initialStopId, savedStops = [], onToggleSavedStop,
+  onStartAlight, alightStopId
 }) {
   const [activeLine, setActiveLine] = useState(line);
   const [pairedLines, setPairedLines] = useState([]);
@@ -321,6 +322,21 @@ export default function LineDetailDrawer({
                           </button>
                         );
                       })()}
+                      {onStartAlight && (
+                        <button
+                          onClick={() => onStartAlight({ line: activeLine, serviceId: details?.serviceId, stop: selectedStop })}
+                          disabled={alightStopId === selectedStop.stopId}
+                          className={`h-9 px-3.5 rounded-full text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                            alightStopId === selectedStop.stopId
+                              ? 'bg-ink text-canvas'
+                              : 'bg-surface hover:bg-surface-2 border border-line text-ink'
+                          }`}
+                          title="Vibra e avisa quando você estiver chegando neste ponto"
+                        >
+                          <BellRing className="w-3.5 h-3.5" />
+                          <span>{alightStopId === selectedStop.stopId ? 'Aviso de descida ativo' : 'Avisar para descer'}</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => onOpenMap(details, selectedStop, activeLine)}
                         className="h-9 px-3.5 rounded-full bg-surface hover:bg-surface-2 border border-line text-xs font-semibold text-ink flex items-center gap-1.5 whitespace-nowrap transition-colors"
