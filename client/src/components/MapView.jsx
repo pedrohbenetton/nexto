@@ -33,7 +33,7 @@ function getDistanceMeters(lat1, lon1, lat2, lon2) {
   return Math.round(R * c);
 }
 
-export default function MapView({ line, details, selectedStop, onClose }) {
+export default function MapView({ line, details, selectedStop, onClose, followVehicleId }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
@@ -363,6 +363,19 @@ export default function MapView({ line, details, selectedStop, onClose }) {
     }
   }, [trackingData, selectedStop, closestStopInfo]);
 
+  // 6.5. Link de viagem compartilhada: segue o ônibus a cada atualização de telemetria
+  const followed = followVehicleId
+    ? trackingData?.vehicles?.find(v => String(v.vehicleId) === String(followVehicleId))
+    : null;
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !followed) return;
+    setSelectedVehicle(followed);
+    map.setView([followed.lat, followed.lng], Math.max(map.getZoom(), 15), { animate: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followed?.lat, followed?.lng]);
+
   // 7. Centralizar câmera em um veículo específico
   const focusOnVehicle = (v) => {
     if (!mapInstanceRef.current) return;
@@ -465,7 +478,17 @@ export default function MapView({ line, details, selectedStop, onClose }) {
       {/* Floating Bottom Telemetry Dock */}
       <div className="absolute bottom-safe-4 left-4 right-4 md:left-4 md:right-auto md:w-96 z-[2000] pointer-events-none">
         <div className="pointer-events-auto bg-surface/95 backdrop-blur-md border border-line rounded-[20px] p-3.5 shadow-lift space-y-2.5">
-          
+          {followVehicleId && trackingData && (
+            <div className={`rounded-[12px] px-3 py-2 text-xs font-semibold flex items-center gap-2 ${
+              followed ? 'bg-brand text-on-brand' : 'bg-warn-soft text-warn'
+            }`}>
+              <Navigation className="w-3.5 h-3.5" />
+              {followed
+                ? `Acompanhando o ônibus #${followVehicleId} ao vivo`
+                : `Ônibus #${followVehicleId} sem sinal de GPS agora`}
+            </div>
+          )}
+
           <div className="flex items-center justify-between border-b border-line pb-2 text-xs">
             <span className="text-accent font-bold flex items-center gap-1.5">
               <Radio className="w-3.5 h-3.5 animate-pulse text-accent" />

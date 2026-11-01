@@ -13,6 +13,7 @@ import { LINE_FILTERS, lineId, filterLines, countByFilter } from './utils/lineFi
 import { AlertCircle, History, SearchX, Star, Route, MapPinOff, Bookmark } from 'lucide-react';
 import MyStops from './components/MyStops';
 import { toggleSavedStop } from './utils/savedStops';
+import { parseShareParams } from './utils/shareTripCore';
 import LinePlate from './components/LinePlate';
 import BottomNav from './components/BottomNav';
 
@@ -59,7 +60,23 @@ export default function App() {
   // Modais e Visualizadores
   const [selectedLine, setSelectedLine] = useState(null);
   const [selectedStopId, setSelectedStopId] = useState(null);
-  const [mapData, setMapData] = useState(null);
+  // Link de viagem compartilhada (?linha=...&onibus=...) abre direto no mapa seguindo o ônibus
+  const [mapData, setMapData] = useState(() => {
+    const trip = parseShareParams(window.location.search);
+    if (!trip) return null;
+    return {
+      line: { lineRoutesPath: trip.lineRoutesPath, routeCode: trip.routeCode },
+      details: { serviceId: trip.serviceId },
+      selectedStop: trip.stopId ? { stopId: trip.stopId } : null,
+      followVehicleId: trip.vehicleId
+    };
+  });
+
+  useEffect(() => {
+    if (parseShareParams(window.location.search)) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [isNearbyModalOpen, setIsNearbyModalOpen] = useState(false);
 
@@ -395,11 +412,13 @@ export default function App() {
       )}
 
       {/* Visualizador de Mapa Interativo (Leaflet) com Rastreador de Ônibus em Tempo Real */}
-      {mapData && (
+      {/* Vindo de link compartilhado, espera o catálogo para mostrar o nome da linha */}
+      {mapData && !(mapData.followVehicleId && loadingLines) && (
         <MapView
-          line={mapData.line}
+          line={lines.find(l => l.lineRoutesPath === mapData.line.lineRoutesPath) || mapData.line}
           details={mapData.details}
           selectedStop={mapData.selectedStop}
+          followVehicleId={mapData.followVehicleId}
           onClose={() => setMapData(null)}
         />
       )}

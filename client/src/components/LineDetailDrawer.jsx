@@ -3,8 +3,9 @@ import { apiUrl } from '../utils/api';
 import { 
   X, Radio, Clock, MapPin, RefreshCw, Bus, AlertCircle, 
   Map, CheckCircle2, Navigation, Activity, Bell, BellRing, 
-  ArrowLeftRight, Users, Sparkles, Bookmark
+  ArrowLeftRight, Users, Sparkles, Bookmark, Share2
 } from 'lucide-react';
+import { PUBLIC_WEB_URL, buildShareUrl, buildShareMessage, shareTrip } from '../utils/shareTrip';
 import { transitAlarm } from '../utils/audioAlert';
 import { tapFeedback } from '../utils/haptics';
 import { isStopSaved, toSavedStop } from '../utils/savedStops';
@@ -427,6 +428,29 @@ export default function LineDetailDrawer({
                                   )}
                                 </button>
 
+                                {/* Compartilhar viagem (WhatsApp etc.) */}
+                                <button
+                                  onClick={() => {
+                                    const url = buildShareUrl(PUBLIC_WEB_URL, {
+                                      lineRoutesPath: activeLine.lineRoutesPath,
+                                      serviceId: details?.serviceId,
+                                      stopId: selectedStop?.stopId,
+                                      vehicleId: v.vehicleId,
+                                      routeCode: activeLine.routeCode
+                                    });
+                                    shareTrip(buildShareMessage({
+                                      line: activeLine,
+                                      stopName: selectedStop?.name,
+                                      seconds: v.secondsUntilArrival,
+                                      url
+                                    }));
+                                  }}
+                                  className="px-3 py-1 rounded-[12px] flex items-center gap-1.5 text-xs font-semibold bg-surface hover:bg-surface-2 text-ink border border-line transition-colors"
+                                  title="Enviar previsão e link de acompanhamento"
+                                >
+                                  <Share2 className="w-3.5 h-3.5 text-muted" />
+                                  <span>Compartilhar</span>
+                                </button>
 
                                 {/* Votação de Lotação */}
                                 <div className="flex items-center gap-1 text-[11px]">
