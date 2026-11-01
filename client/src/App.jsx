@@ -10,7 +10,9 @@ import FilterPills from './components/FilterPills';
 import EmptyState from './components/EmptyState';
 import { LineListSkeleton } from './components/Skeleton';
 import { LINE_FILTERS, lineId, filterLines, countByFilter } from './utils/lineFilters';
-import { AlertCircle, Radio, History, SearchX, Star, Route, MapPinOff } from 'lucide-react';
+import { AlertCircle, History, SearchX, Star, Route, MapPinOff } from 'lucide-react';
+import LinePlate from './components/LinePlate';
+import BottomNav from './components/BottomNav';
 
 export default function App() {
   // Estado da Cidade Ativa (padrão: Sorocaba - SP)
@@ -203,13 +205,11 @@ export default function App() {
     };
   })();
 
-  return (
-    <div className="relative min-h-screen bg-[#f8f9fb] text-[#0b3558] flex flex-col font-sans overflow-x-hidden selection:bg-[#006bff] selection:text-white">
-      
-      {/* Decorative Atmosphere Blobs (Coral Magenta & Sky Cyan - Calendly System) */}
-      <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[720px] h-[320px] bg-gradient-to-r from-[#e55cff]/10 via-[#0099ff]/12 to-transparent rounded-full blur-3xl pointer-events-none -z-10" />
+  const bottomNavActive = isNearbyModalOpen ? 'nearby' : isCityModalOpen ? 'city' : showOnlyFavorites ? 'favorites' : 'lines';
 
-      {/* Top Navbar */}
+  return (
+    <div className="relative min-h-screen bg-canvas text-ink flex flex-col font-sans overflow-x-hidden selection:bg-brand selection:text-on-brand">
+
       <Header
         currentCity={currentCity}
         onOpenCityModal={() => setIsCityModalOpen(true)}
@@ -228,100 +228,120 @@ export default function App() {
         }}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-[1200px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-4">
-        
-        {/* Status / Estatísticas Técnicas */}
-        <div className="flex items-center justify-between text-xs text-[#476788] px-1 border-b border-[#d4e0ed] pb-3">
-          <span>
-            {loadingLines ? (
-              'Sincronizando catálogo de rotas e telemetria...'
-            ) : (
-              <>
-                Rotas Disponíveis: <strong className="text-[#0b3558] font-semibold">{filteredLines.length}</strong> de <span className="text-[#476788]">{lines.length}</span>
-              </>
-            )}
-          </span>
+      <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 sm:px-6 pt-5 sm:pt-8 pb-tabbar md:pb-12 space-y-6">
 
-          <span className="flex items-center gap-1.5 text-[#006bff] font-semibold">
-            <Radio className="w-3.5 h-3.5 text-[#006bff]" />
-            <span className="hidden sm:inline">SATÉLITE E GTFS ATIVOS</span>
-          </span>
-        </div>
+        {/* Hero */}
+        {!hasSearch && activeFilter === 'all' && (
+          <section className="relative overflow-hidden rounded-[28px] bg-[#0e1116] text-white dark:bg-surface dark:border dark:border-line px-5 py-6 sm:px-8 sm:py-9">
+            <div aria-hidden="true" className="absolute -right-14 -top-14 w-32 h-32 sm:-right-10 sm:-top-16 sm:w-56 sm:h-56 rounded-full bg-brand" />
+            <div aria-hidden="true" className="absolute -right-6 -bottom-12 w-24 h-24 sm:right-16 sm:bottom-[-70px] sm:w-40 sm:h-40 rounded-full bg-signal" />
+            <div className="relative max-w-[78%] sm:max-w-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
+                {currentCity?.cityName || 'Sorocaba'} · {currentCity?.stateInitials || 'SP'}
+              </p>
+              <h2 className="mt-2 font-display text-[28px] sm:text-[40px] font-bold leading-[1.05]">
+                Pra onde você vai <span className="text-brand">agora?</span>
+              </h2>
+              <p className="mt-3 text-sm text-white/70">
+                {loadingLines
+                  ? 'Carregando linhas da cidade...'
+                  : `${lines.length} linhas com ônibus em tempo real. Sem anúncios, sempre.`}
+              </p>
+            </div>
+          </section>
+        )}
 
-        {/* Linhas Acessadas Recentemente */}
-        {!searchTerm && recentLines.length > 0 && activeFilter === 'all' && (
-          <div className="space-y-2 pt-1 pb-2">
-            <div className="flex items-center justify-between text-xs text-[#476788] font-semibold px-1">
-              <span className="flex items-center gap-1.5">
-                <History className="w-3.5 h-3.5 text-[#006bff]" />
-                <span>ÚLTIMAS ROTAS CONSULTADAS</span>
-              </span>
-              <button 
+        {/* Recentes */}
+        {!hasSearch && recentLines.length > 0 && activeFilter === 'all' && (
+          <section className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-base font-bold text-ink flex items-center gap-2">
+                <History className="w-4 h-4 text-muted" />
+                Recentes
+              </h2>
+              <button
                 onClick={() => setRecentLines([])}
-                className="text-[#476788] hover:text-[#0b3558] transition-colors"
+                className="text-xs font-semibold text-muted hover:text-ink transition-colors"
               >
                 Limpar
               </button>
             </div>
-            <div className="flex items-center gap-2.5 overflow-x-auto pb-1.5">
+            <div className="flex items-center gap-2.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
               {recentLines.map((rl) => (
                 <button
                   key={rl.lineRoutesPath || rl.id}
                   onClick={() => handleSelectLine(rl)}
-                  className="px-3 py-2 rounded-[12px] bg-[#ffffff] hover:bg-[#ffffff] border border-[#d4e0ed] hover:border-[#006bff] text-xs flex items-center gap-2.5 flex-shrink-0 transition-all shadow-calendly-sm hover:-translate-y-0.5"
+                  className="pl-1.5 pr-3.5 py-1.5 rounded-2xl bg-surface border border-line hover:border-line-strong flex items-center gap-2.5 flex-shrink-0 transition-colors"
                 >
-                  <span className="px-2 py-0.5 rounded-[6px] bg-[#f0f3f8] text-[#006bff] font-bold text-xs">
-                    {rl.routeCode}
-                  </span>
-                  <span className="text-[#0b3558] font-semibold truncate max-w-[170px]">
+                  <LinePlate line={rl} size="sm" />
+                  <span className="text-sm font-semibold text-ink truncate max-w-[170px]">
                     {rl.routeMnemonic}
                   </span>
                 </button>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Lista de Linhas */}
-        {/* Filtros de Categoria (pills) */}
-        {!loadingLines && !linesError && lines.length > 0 && (
-          <FilterPills activeFilter={activeFilter} counts={filterCounts} onChange={setActiveFilter} />
-        )}
+        {/* Lista de linhas */}
+        <section className="space-y-3.5">
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="font-display text-base font-bold text-ink">
+              {hasSearch ? 'Resultados' : showOnlyFavorites ? 'Seus favoritos' : 'Todas as linhas'}
+            </h2>
+            {!loadingLines && !linesError && (
+              <span className="text-xs text-muted">
+                <strong className="text-ink font-semibold">{filteredLines.length}</strong> de {lines.length}
+              </span>
+            )}
+          </div>
 
-        {loadingLines ? (
-          <LineListSkeleton count={6} />
-        ) : linesError ? (
-          <div className="py-16 text-center space-y-3 p-8 rounded-[24px] bg-[#ffffff] border border-red-200 shadow-calendly-sm">
-            <AlertCircle className="w-8 h-8 mx-auto text-red-500" />
-            <p className="text-sm font-bold text-red-700">{linesError}</p>
-            <button
-              onClick={() => setCurrentCity({ ...currentCity })}
-              className="px-4 py-2 rounded-[8px] bg-[#006bff] hover:bg-[#005ce6] text-xs font-semibold text-white transition-all shadow-sm"
-            >
-              Tentar Novamente
-            </button>
-          </div>
-        ) : filteredLines.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {filteredLines.map(line => {
-              const id = lineId(line);
-              const isFav = favorites.includes(id);
-              return (
-                <LineCard
-                  key={id}
-                  line={line}
-                  isFavorite={isFav}
-                  onToggleFavorite={handleToggleFavorite}
-                  onSelectLine={handleSelectLine}
-                />
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyState {...emptyState} />
-        )}
+          {!loadingLines && !linesError && lines.length > 0 && (
+            <FilterPills activeFilter={activeFilter} counts={filterCounts} onChange={setActiveFilter} />
+          )}
+
+          {loadingLines ? (
+            <LineListSkeleton count={6} />
+          ) : linesError ? (
+            <EmptyState
+              icon={AlertCircle}
+              title="Não conseguimos carregar as linhas"
+              description={linesError}
+              actions={[{ label: 'Tentar novamente', onClick: () => setCurrentCity({ ...currentCity }), primary: true }]}
+            />
+          ) : filteredLines.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {filteredLines.map(line => {
+                const id = lineId(line);
+                const isFav = favorites.includes(id);
+                return (
+                  <LineCard
+                    key={id}
+                    line={line}
+                    isFavorite={isFav}
+                    onToggleFavorite={handleToggleFavorite}
+                    onSelectLine={handleSelectLine}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState {...emptyState} />
+          )}
+        </section>
       </main>
+
+      <BottomNav
+        active={bottomNavActive}
+        favoritesCount={favorites.length}
+        onLines={() => {
+          setActiveFilter('all');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNearby={() => setIsNearbyModalOpen(true)}
+        onFavorites={() => setActiveFilter(prev => (prev === 'favorites' ? 'all' : 'favorites'))}
+        onCity={() => setIsCityModalOpen(true)}
+      />
 
       {/* Drawer de Detalhes da Linha & Previsões em Tempo Real */}
       {selectedLine && (

@@ -1,68 +1,51 @@
-@theme {
-  /* Colors */
-  --color-ink-navy: #0b3558;
-  --color-signal-blue: #006bff;
-  --color-slate-gray: #476788;
-  --color-mist-gray: #a6bbd1;
-  --color-cloud: #f8f9fb;
-  --color-paper: #ffffff;
-  --color-pebble: #f0f3f8;
-  --color-hairline: #d4e0ed;
-  --color-carbon: #0a0a0a;
-  --color-coral-magenta: #e55cff;
-  --color-sky-cyan: #0099ff;
-  --color-deep-cobalt: #004eba;
+/* ==========================================================================
+   Nexto — Design System "Mobilidade Vibrante"
+   Tokens semânticos com valores para tema claro e escuro (segue o sistema).
+   Os valores reais ficam em --nx-* (index.css); aqui só o mapeamento p/ Tailwind.
+   Não declarar --spacing-<n>: no Tailwind v4 isso sobrescreve w-96, h-8 etc.
+   ========================================================================== */
+@theme inline {
+  /* Superfícies */
+  --color-canvas: var(--nx-canvas);
+  --color-surface: var(--nx-surface);
+  --color-surface-2: var(--nx-surface-2);
+  --color-surface-3: var(--nx-surface-3);
+  --color-line: var(--nx-line);
+  --color-line-strong: var(--nx-line-strong);
+  --color-scrim: var(--nx-scrim);
 
-  /* Typography */
-  --font-gilroy: 'Manrope', 'Gilroy', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Texto */
+  --color-ink: var(--nx-ink);
+  --color-muted: var(--nx-muted);
+  --color-faint: var(--nx-faint);
 
-  /* Typography — Scale */
-  --text-caption: 12px;
-  --leading-caption: 1.5;
-  --tracking-caption: 0px;
-  --text-body-sm: 14px;
-  --leading-body-sm: 1.4;
-  --tracking-body-sm: 0px;
-  --text-body: 16px;
-  --leading-body: 1;
-  --tracking-body: 0px;
-  --text-button: 18px;
-  --leading-button: 1.6;
-  --tracking-button: 0px;
-  --text-body-lg: 20px;
-  --leading-body-lg: 1.4;
-  --tracking-body-lg: 0px;
-  --text-subheading: 28px;
-  --leading-subheading: 1.4;
-  --tracking-subheading: 0px;
-  --text-heading-sm: 38px;
-  --leading-heading-sm: 1.21;
-  --tracking-heading-sm: 0px;
-  --text-heading: 50px;
-  --leading-heading: 1.2;
-  --tracking-heading: 0px;
-  --text-heading-lg: 68px;
-  --leading-heading-lg: 1.2;
-  --tracking-heading-lg: 0px;
-  --text-display: 80px;
-  --leading-display: 1.2;
-  --tracking-display: 0px;
+  /* Marca: lime de sinalização */
+  --color-brand: var(--nx-brand);
+  --color-brand-strong: var(--nx-brand-strong);
+  --color-brand-soft: var(--nx-brand-soft);
+  --color-on-brand: var(--nx-on-brand);
+  --color-accent: var(--nx-accent);
 
-  /* Spacing: usa a escala padrão do Tailwind (múltiplos de 4px).
-     Não declarar --spacing-<n> aqui: no Tailwind v4 isso sobrescreve
-     utilitários como w-96 / max-h-40 / h-8 com o valor em px literal. */
+  /* Apoio */
+  --color-signal: var(--nx-signal);
+  --color-signal-soft: var(--nx-signal-soft);
+  --color-info: var(--nx-info);
+  --color-info-soft: var(--nx-info-soft);
 
-  /* Border Radius */
-  --radius-md: 4px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-3xl: 24px;
-  --radius-full: 50px;
-  --radius-full-2: 9999px;
+  /* Estados */
+  --color-success: var(--nx-success);
+  --color-success-soft: var(--nx-success-soft);
+  --color-warn: var(--nx-warn);
+  --color-warn-soft: var(--nx-warn-soft);
+  --color-danger: var(--nx-danger);
+  --color-danger-soft: var(--nx-danger-soft);
 
-  /* Shadows */
-  --shadow-sm: rgba(71, 103, 136, 0.04) 0px 4px 5px 0px, rgba(71, 103, 136, 0.03) 0px 4px 10px 0px, rgba(71, 103, 136, 0.05) 0px 10px 20px 0px;
-  --shadow-sm-2: rgba(71, 103, 136, 0.04) 0px 4px 5px 0px, rgba(71, 103, 136, 0.03) 0px 8px 15px 0px, rgba(71, 103, 136, 0.08) 0px 30px 50px 0px;
-  --shadow-sm-3: rgba(71, 103, 136, 0.04) 0px 4px 5px 0px, rgba(71, 103, 136, 0.03) 0px 8px 15px 0px, rgba(71, 103, 136, 0.06) 0px 15px 30px 0px;
+  /* Tipografia */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Elevação */
+  --shadow-soft: var(--nx-shadow-soft);
+  --shadow-lift: var(--nx-shadow-lift);
 }

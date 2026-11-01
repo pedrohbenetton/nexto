@@ -1,15 +1,46 @@
 @import "tailwindcss";
 @import "./theme.css";
 @import "leaflet/dist/leaflet.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
 
+/* Tema claro (padrão) */
 @layer base {
   :root {
-    --bg-base: #f8f9fb;
-    --bg-surface: #ffffff;
-    --bg-card: #ffffff;
-    --border-subtle: #d4e0ed;
-    --font-sans: 'Manrope', 'Gilroy', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color-scheme: light;
+
+    --nx-canvas: #f6f7f2;
+    --nx-surface: #ffffff;
+    --nx-surface-2: #eef0e8;
+    --nx-surface-3: #e3e6da;
+    --nx-line: #dcdfd4;
+    --nx-line-strong: #c2c6b8;
+    --nx-scrim: rgb(8 10 14 / 0.55);
+
+    --nx-ink: #0e1116;
+    --nx-muted: #5a6170;
+    --nx-faint: #8c929e;
+
+    --nx-brand: #c6f432;
+    --nx-brand-strong: #b2df1c;
+    --nx-brand-soft: #eef9c8;
+    --nx-on-brand: #0e1116;
+    --nx-accent: #457200;
+
+    --nx-signal: #f0582a;
+    --nx-signal-soft: #ffe8df;
+    --nx-info: #2f6fe8;
+    --nx-info-soft: #e3edff;
+
+    --nx-success: #067647;
+    --nx-success-soft: #dcfae6;
+    --nx-warn: #b54708;
+    --nx-warn-soft: #fef0c7;
+    --nx-danger: #d92d20;
+    --nx-danger-soft: #fee4e2;
+
+    --nx-shadow-soft: 0 1px 2px rgb(14 17 22 / 0.04), 0 4px 12px rgb(14 17 22 / 0.05);
+    --nx-shadow-lift: 0 2px 4px rgb(14 17 22 / 0.04), 0 12px 32px rgb(14 17 22 / 0.10);
 
     /* Safe areas (notch, status bar e barra de navegação). env() exige viewport-fit=cover no index.html;
        --safe-area-inset-* é injetado pelo Capacitor em WebViews Android que não reportam env(). */
@@ -19,14 +50,66 @@
     --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
   }
 
+  /* Tema escuro (segue o sistema) */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+
+      --nx-canvas: #0e1116;
+      --nx-surface: #161a21;
+      --nx-surface-2: #1d222b;
+      --nx-surface-3: #262c37;
+      --nx-line: #2a303b;
+      --nx-line-strong: #3b4351;
+      --nx-scrim: rgb(0 0 0 / 0.65);
+
+      --nx-ink: #f1f3ec;
+      --nx-muted: #9ba3b1;
+      --nx-faint: #6b7382;
+
+      --nx-brand: #c6f432;
+      --nx-brand-strong: #d6fb63;
+      --nx-brand-soft: #232c0f;
+      --nx-on-brand: #0e1116;
+      --nx-accent: #c6f432;
+
+      --nx-signal: #ff7a50;
+      --nx-signal-soft: #3a1d13;
+      --nx-info: #6ea0ff;
+      --nx-info-soft: #16233d;
+
+      --nx-success: #47cd89;
+      --nx-success-soft: #0f2a1c;
+      --nx-warn: #fdb022;
+      --nx-warn-soft: #362709;
+      --nx-danger: #f97066;
+      --nx-danger-soft: #3a1815;
+
+      --nx-shadow-soft: 0 1px 2px rgb(0 0 0 / 0.30);
+      --nx-shadow-lift: 0 12px 32px rgb(0 0 0 / 0.45);
+    }
+  }
+
   body {
-    background-color: #f8f9fb;
-    color: #0b3558;
+    background-color: var(--nx-canvas);
+    color: var(--nx-ink);
     font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
     padding-left: var(--safe-left);
     padding-right: var(--safe-right);
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--nx-accent);
+    outline-offset: 2px;
   }
 }
 
@@ -53,36 +136,33 @@
   bottom: calc(1rem + var(--safe-bottom));
 }
 
-/* Scrollbar sutil e elegante */
+/* Espaço para a barra de navegação inferior do mobile (64px + inset) */
+@utility pb-tabbar {
+  padding-bottom: calc(5.5rem + var(--safe-bottom));
+}
+
+/* Faixas roláveis na horizontal (pills, recentes, sentidos): sem barra visível */
+.overflow-x-auto {
+  scrollbar-width: none;
+}
+.overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}
+
+/* Scrollbar discreta */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f0f3f8;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d4e0ed;
+  background: var(--nx-line-strong);
   border-radius: 9999px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #a6bbd1;
-}
 
-/* Sombras Calendly normalizadas */
-.shadow-calendly-card {
-  box-shadow: rgba(71, 103, 136, 0.04) 0px 4px 5px 0px, 
-              rgba(71, 103, 136, 0.03) 0px 8px 15px 0px, 
-              rgba(71, 103, 136, 0.08) 0px 20px 40px 0px;
-}
-
-.shadow-calendly-sm {
-  box-shadow: rgba(71, 103, 136, 0.04) 0px 4px 5px 0px, 
-              rgba(71, 103, 136, 0.03) 0px 4px 10px 0px, 
-              rgba(71, 103, 136, 0.05) 0px 8px 16px 0px;
-}
-
-/* Skeleton shimmer (Pebble #f0f3f8 com onda #e7edf6) */
+/* Skeleton shimmer */
 @keyframes skeleton-shimmer {
   0% {
     background-position: 100% 0;
@@ -93,8 +173,8 @@
 }
 
 .skeleton {
-  background-color: #f0f3f8;
-  background-image: linear-gradient(90deg, #f0f3f8 0%, #e7edf6 50%, #f0f3f8 100%);
+  background-color: var(--nx-surface-2);
+  background-image: linear-gradient(90deg, var(--nx-surface-2) 0%, var(--nx-surface-3) 50%, var(--nx-surface-2) 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
@@ -105,23 +185,29 @@
   }
 }
 
-/* Leaflet Light Theme Overrides - Calendly Editorial */
+/* Leaflet */
 .leaflet-container {
-  background-color: #f8f9fb !important;
+  background-color: var(--nx-canvas) !important;
   font-family: var(--font-sans) !important;
 }
 
 .leaflet-tile {
-  /* Renderização natural e nítida das vias urbanas sem inversão escura */
-  filter: contrast(1.04) saturate(1.1);
+  filter: saturate(0.85) contrast(1.02);
+}
+
+/* Mapa escuro sem trocar de provedor: inverte só os tiles (marcadores e traçado mantêm as cores) */
+@media (prefers-color-scheme: dark) {
+  .leaflet-tile {
+    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.6);
+  }
 }
 
 .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-  background: #ffffff !important;
-  color: #0b3558 !important;
-  border: 1px solid #d4e0ed !important;
-  border-radius: 12px !important;
-  box-shadow: rgba(71, 103, 136, 0.08) 0px 10px 30px 0px !important;
+  background: var(--nx-surface) !important;
+  color: var(--nx-ink) !important;
+  border: 1px solid var(--nx-line) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--nx-shadow-lift) !important;
 }
 
 .leaflet-popup-content {
@@ -130,7 +216,13 @@
   font-family: var(--font-sans) !important;
 }
 
-/* Radar pulse para os ônibus em tempo real (Signal Blue #006bff) */
+.leaflet-bar a {
+  background: var(--nx-surface) !important;
+  color: var(--nx-ink) !important;
+  border-color: var(--nx-line) !important;
+}
+
+/* Pulso de radar dos ônibus em tempo real */
 @keyframes radar-ping-blue {
   0% {
     transform: scale(0.9);
@@ -148,4 +240,17 @@
 
 .radar-beacon {
   animation: radar-ping-blue 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 160ms ease-out;
 }

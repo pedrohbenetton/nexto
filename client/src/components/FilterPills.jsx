@@ -19,14 +19,14 @@ export default function FilterPills({ activeFilter, counts, onChange }) {
             type="button"
             aria-pressed={active}
             onClick={() => onChange(f.id)}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-[50px] border text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#006bff] ${
+            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full border text-[13px] font-semibold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
               active
-                ? 'bg-[#006bff] border-[#006bff] text-white'
-                : 'bg-[#ffffff] border-[#d4e0ed] text-[#0b3558] hover:border-[#006bff] hover:text-[#006bff]'
+                ? 'bg-brand border-brand text-on-brand'
+                : 'bg-surface border-line text-ink hover:border-line-strong'
             }`}
           >
             <span>{f.label}</span>
-            <span className={`text-[11px] font-bold ${active ? 'text-white/80' : 'text-[#a6bbd1]'}`}>
+            <span className={`text-[11px] font-bold ${active ? 'text-on-brand/60' : 'text-faint'}`}>
               {counts[f.id] ?? 0}
             </span>
           </button>

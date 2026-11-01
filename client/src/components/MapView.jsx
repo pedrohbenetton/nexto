@@ -1,11 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiUrl } from '../utils/api';
 import { getCurrentPosition } from '../utils/geolocation';
+import LinePlate from './LinePlate';
 import L from 'leaflet';
 import { 
   X, RefreshCw, Radio, Navigation, Eye, MapPin, Bus, 
   Crosshair, Footprints, Users, ArrowLeftRight
 } from 'lucide-react';
+
+// Cores do mapa: fixas (legíveis sobre tiles claros e escuros), alinhadas à marca
+const MAP_COLORS = {
+  route: '#c6f432',
+  casing: '#0e1116',
+  ink: '#0e1116',
+  paper: '#ffffff',
+  user: '#2f6fe8'
+};
 
 // Cálculo de distância geodésica em metros (Haversine)
 function getDistanceMeters(lat1, lon1, lat2, lon2) {
@@ -82,7 +92,7 @@ export default function MapView({ line, details, selectedStop, onClose }) {
     // Zoom no canto inferior direito
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // OpenStreetMap com renderização limpa e nítida
+    // Tiles OSM (sem chave). No tema escuro, index.css inverte só os tiles.
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19
@@ -154,8 +164,8 @@ export default function MapView({ line, details, selectedStop, onClose }) {
 
           const userHtml = `
             <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
-              <div style="position: absolute; width: 32px; height: 32px; border-radius: 50%; background: rgba(0, 107, 255, 0.2); animation: radar-ping-blue 2s infinite;"></div>
-              <div style="width: 14px; height: 14px; border-radius: 50%; background: #006bff; border: 2.5px solid #ffffff; box-shadow: 0 0 10px rgba(0,107,255,0.5);"></div>
+              <div style="position: absolute; width: 32px; height: 32px; border-radius: 50%; background: rgb(47 111 232 / 0.22); animation: radar-ping-blue 2s infinite;"></div>
+              <div style="width: 14px; height: 14px; border-radius: 50%; background: ${MAP_COLORS.user}; border: 2.5px solid ${MAP_COLORS.paper}; box-shadow: 0 0 10px rgb(47 111 232 / 0.5);"></div>
             </div>
           `;
 
@@ -169,9 +179,9 @@ export default function MapView({ line, details, selectedStop, onClose }) {
           L.marker([coords.lat, coords.lng], { icon: userIcon, zIndexOffset: 2000 })
             .addTo(userLayerRef.current)
             .bindPopup(`
-              <div style="font-family: var(--font-sans); color: #0b3558;">
+              <div style="font-family: var(--font-sans); color: var(--nx-ink);">
                 <p style="font-weight: 700; margin: 0 0 2px 0;">📍 Sua Localização</p>
-                <p style="font-size: 11px; color: #476788; margin: 0;">GPS ativo com alta precisão</p>
+                <p style="font-size: 11px; color: var(--nx-muted); margin: 0;">GPS ativo com alta precisão</p>
               </div>
             `);
 
@@ -202,12 +212,20 @@ export default function MapView({ line, details, selectedStop, onClose }) {
 
     const bounds = L.latLngBounds();
 
-    // A. Traçado Asfáltico Contínuo OSRM em Signal Blue #006bff
+    // A. Traçado OSRM: lime da marca com contorno escuro (lê bem em tiles claros e escuros)
     if (trackingData.polyline && trackingData.polyline.length > 1) {
+      L.polyline(trackingData.polyline, {
+        color: MAP_COLORS.casing,
+        weight: 9,
+        opacity: 0.9,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(polylineLayerRef.current);
+
       const linePath = L.polyline(trackingData.polyline, {
-        color: '#006bff',
+        color: MAP_COLORS.route,
         weight: 5,
-        opacity: 0.88,
+        opacity: 1,
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(polylineLayerRef.current);
@@ -225,10 +243,10 @@ export default function MapView({ line, details, selectedStop, onClose }) {
           <div style="
             width: ${isClosestToUser ? '16px' : isTarget ? '16px' : '10px'};
             height: ${isClosestToUser ? '16px' : isTarget ? '16px' : '10px'};
-            background: ${isClosestToUser ? '#006bff' : isTarget ? '#0b3558' : '#ffffff'};
-            border: 2px solid ${isClosestToUser ? '#ffffff' : isTarget ? '#ffffff' : '#006bff'};
+            background: ${isClosestToUser ? MAP_COLORS.user : isTarget ? MAP_COLORS.route : MAP_COLORS.paper};
+            border: ${isTarget ? '3px' : '2px'} solid ${isClosestToUser ? MAP_COLORS.paper : MAP_COLORS.ink};
             border-radius: 50%;
-            box-shadow: 0 1px 4px rgba(71,103,136,0.25);
+            box-shadow: 0 1px 4px rgb(14 17 22 / 0.3);
           "></div>
         `;
 
@@ -243,19 +261,19 @@ export default function MapView({ line, details, selectedStop, onClose }) {
           .addTo(markersLayerRef.current);
 
         stopMarker.bindPopup(`
-          <div style="font-family: var(--font-sans); color: #0b3558; min-width: 190px;">
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #d4e0ed; padding-bottom: 4px; margin-bottom: 6px;">
-              <span style="color: ${isClosestToUser ? '#006bff' : '#0b3558'}; font-weight: 700; font-size: 11px;">
+          <div style="font-family: var(--font-sans); color: var(--nx-ink); min-width: 190px;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--nx-line); padding-bottom: 4px; margin-bottom: 6px;">
+              <span style="color: ${isClosestToUser ? 'var(--nx-accent)' : 'var(--nx-ink)'}; font-weight: 700; font-size: 11px;">
                 ${isClosestToUser ? '📍 SUA PARADA MAIS PRÓXIMA' : `PARADA #${idx + 1}`}
               </span>
-              <span style="color: #a6bbd1; font-size: 10px;">${stop.stopId ? stop.stopId.slice(0, 8) : ''}</span>
+              <span style="color: var(--nx-faint); font-size: 10px;">${stop.stopId ? stop.stopId.slice(0, 8) : ''}</span>
             </div>
-            <p style="font-size: 12px; margin: 0 0 6px 0; color: #0b3558; font-weight: 600;">
+            <p style="font-size: 12px; margin: 0 0 6px 0; color: var(--nx-ink); font-weight: 600;">
               ${stop.name}
             </p>
-            <div style="font-size: 11px; color: #476788;">
-              Partidas hoje: <strong style="color: #0b3558;">${stop.departures?.length || 0}</strong>
-              ${isClosestToUser ? ` • <span style="color: #006bff; font-weight: 700;">${closestStopInfo.distanceMeters}m a pé</span>` : ''}
+            <div style="font-size: 11px; color: var(--nx-muted);">
+              Partidas hoje: <strong style="color: var(--nx-ink);">${stop.departures?.length || 0}</strong>
+              ${isClosestToUser ? ` • <span style="color: var(--nx-accent); font-weight: 700;">${closestStopInfo.distanceMeters}m a pé</span>` : ''}
             </div>
           </div>
         `);
@@ -276,26 +294,26 @@ export default function MapView({ line, details, selectedStop, onClose }) {
               width: 44px;
               height: 44px;
               border-radius: 50%;
-              background: ${v.isRealTime ? 'rgba(0, 107, 255, 0.22)' : 'rgba(11, 53, 88, 0.15)'};
-              border: 1.5px solid ${v.isRealTime ? '#006bff' : '#0b3558'};
+              background: ${v.isRealTime ? 'rgb(198 244 50 / 0.35)' : 'rgb(14 17 22 / 0.15)'};
+              border: 1.5px solid ${v.isRealTime ? MAP_COLORS.route : MAP_COLORS.ink};
             "></div>
 
             <div style="
               position: relative;
               z-index: 10;
-              background: #0b3558;
-              border: 1.5px solid #ffffff;
-              border-radius: 8px;
-              padding: 2px 7px;
+              background: ${MAP_COLORS.ink};
+              border: 2px solid ${v.isRealTime ? MAP_COLORS.route : MAP_COLORS.paper};
+              border-radius: 10px;
+              padding: 2px 8px;
               display: flex;
               align-items: center;
               gap: 5px;
-              box-shadow: 0 4px 12px rgba(11, 53, 88, 0.28);
+              box-shadow: 0 4px 12px rgb(14 17 22 / 0.35);
             ">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${MAP_COLORS.route}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M8 6v6"></path><path d="M15 6v6"></path><path d="M2 12h19.6"></path><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4C2.9 6 1.9 6.8 1.6 7.8L.2 12.8c-.1.4-.2.8-.2 1.2 0 .4.1.8.2 1.2.3 1.1.8 2.8.8 2.8h3"></path><circle cx="7" cy="18" r="2"></circle><circle cx="17" cy="18" r="2"></circle>
               </svg>
-              <span style="font-size: 11px; font-weight: 700; color: #ffffff;">${v.vehicleId}</span>
+              <span style="font-family: var(--font-display); font-size: 11px; font-weight: 700; color: ${MAP_COLORS.paper};">${v.vehicleId}</span>
             </div>
           </div>
         `;
@@ -311,26 +329,26 @@ export default function MapView({ line, details, selectedStop, onClose }) {
           .addTo(markersLayerRef.current);
 
         busMarker.bindPopup(`
-          <div style="font-family: var(--font-sans); color: #0b3558; min-width: 220px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d4e0ed; padding-bottom: 5px; margin-bottom: 8px;">
-              <span style="color: #0b3558; font-weight: 800; font-size: 13px;">Ônibus #${v.vehicleId}</span>
-              <span style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 9999px; background: ${v.isRealTime ? '#e6f0ff' : '#f0f3f8'}; color: ${v.isRealTime ? '#004eba' : '#476788'};">
+          <div style="font-family: var(--font-sans); color: var(--nx-ink); min-width: 220px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--nx-line); padding-bottom: 5px; margin-bottom: 8px;">
+              <span style="color: var(--nx-ink); font-weight: 800; font-size: 13px;">Ônibus #${v.vehicleId}</span>
+              <span style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 9999px; background: ${v.isRealTime ? 'var(--nx-brand-soft)' : 'var(--nx-surface-2)'}; color: ${v.isRealTime ? 'var(--nx-accent)' : 'var(--nx-muted)'};">
                 ${v.isRealTime ? 'GPS ATIVO' : 'HORÁRIO ESTIMADO'}
               </span>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr; gap: 4px; font-size: 12px; margin-bottom: 8px;">
               <div>
-                <span style="color: #476788;">Status: </span>
-                <strong style="color: #0b3558;">${isApproaching ? 'Em Aproximação' : 'Em Trânsito'}</strong>
+                <span style="color: var(--nx-muted);">Status: </span>
+                <strong style="color: var(--nx-ink);">${isApproaching ? 'Em Aproximação' : 'Em Trânsito'}</strong>
               </div>
               <div>
-                <span style="color: #476788;">Previsão de Chegada: </span>
-                <strong style="color: #006bff;">${v.minutesUntilArrival} min (${v.secondsUntilArrival}s)</strong>
+                <span style="color: var(--nx-muted);">Previsão de Chegada: </span>
+                <strong style="color: var(--nx-accent);">${v.minutesUntilArrival} min (${v.secondsUntilArrival}s)</strong>
               </div>
               <div>
-                <span style="color: #476788;">Próxima Parada: </span>
-                <span style="color: #0b3558; font-weight: 500;">${v.nextStopName ? v.nextStopName.slice(0, 35) + '...' : 'Em rota'}</span>
+                <span style="color: var(--nx-muted);">Próxima Parada: </span>
+                <span style="color: var(--nx-ink); font-weight: 500;">${v.nextStopName ? v.nextStopName.slice(0, 35) + '...' : 'Em rota'}</span>
               </div>
             </div>
           </div>
@@ -365,39 +383,37 @@ export default function MapView({ line, details, selectedStop, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#f8f9fb] text-[#0b3558] animate-fade-in">
+    <div className="fixed inset-0 z-50 flex flex-col bg-canvas text-ink animate-fade-in">
       
       {/* Top Telemetry Header (À Esquerda) */}
       <div className="absolute top-safe-4 left-4 z-[2000] pointer-events-none">
-        <div className="pointer-events-auto bg-[#ffffff]/95 backdrop-blur-md border border-[#d4e0ed] rounded-[16px] p-3 shadow-calendly-card flex items-center gap-3">
-          <div className="px-2.5 py-1.5 rounded-[8px] bg-[#f0f3f8] border border-[#d4e0ed] text-[#006bff] font-bold text-sm">
-            {currentLine?.routeCode || 'BUS'}
-          </div>
+        <div className="pointer-events-auto bg-surface/95 backdrop-blur-md border border-line rounded-[20px] p-3 shadow-lift flex items-center gap-3">
+          <LinePlate line={currentLine || {}} />
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-sm sm:text-base text-[#0b3558] truncate max-w-[160px] sm:max-w-xs">
+              <h2 className="font-bold text-sm sm:text-base text-ink truncate max-w-[160px] sm:max-w-xs">
                 {currentLine?.routeMnemonic || 'Itinerário'}
               </h2>
-              <span className="hidden sm:inline text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#e6f0ff] text-[#004eba] border border-[#006bff]/20">
+              <span className="hidden sm:inline text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-soft text-accent border border-accent/20">
                 GPS AO VIVO (EM CIRCULAÇÃO)
               </span>
             </div>
-            <p className="text-xs text-[#476788] flex items-center gap-2 mt-0.5">
-              <span>Veículos: <strong className="text-[#0b3558]">{trackingData?.vehiclesCount || 0}</strong></span>
+            <p className="text-xs text-muted flex items-center gap-2 mt-0.5">
+              <span>Veículos: <strong className="text-ink">{trackingData?.vehiclesCount || 0}</strong></span>
               <span>•</span>
-              <span>Headway: <strong className="text-[#006bff]">~{trackingData?.telemetrySummary?.estimatedHeadwayMinutes || 15} min</strong></span>
+              <span>Headway: <strong className="text-accent">~{trackingData?.telemetrySummary?.estimatedHeadwayMinutes || 15} min</strong></span>
               <span>•</span>
-              <span>Paradas: <strong className="text-[#0b3558]">{trackingData?.stopsCount || 0}</strong></span>
+              <span>Paradas: <strong className="text-ink">{trackingData?.stopsCount || 0}</strong></span>
             </p>
           </div>
         </div>
 
         {/* Notificação de Parada Mais Próxima a Pé */}
         {closestStopInfo && (
-          <div className="pointer-events-auto mt-2 p-2.5 rounded-[12px] bg-[#e6f0ff]/95 backdrop-blur-md border border-[#006bff]/40 shadow-calendly-sm text-xs text-[#004eba] flex items-center gap-2">
-            <Footprints className="w-4 h-4 text-[#006bff] flex-shrink-0 animate-pulse" />
+          <div className="pointer-events-auto mt-2 p-2.5 rounded-[12px] bg-brand-soft/95 backdrop-blur-md border border-accent/40 shadow-soft text-xs text-accent flex items-center gap-2">
+            <Footprints className="w-4 h-4 text-accent flex-shrink-0 animate-pulse" />
             <span>
-              Você está a <strong>{closestStopInfo.distanceMeters}m</strong> ({closestStopInfo.walkMinutes} min) da parada: <strong className="text-[#0b3558]">{closestStopInfo.stop.name.split(',')[0]}</strong>
+              Você está a <strong>{closestStopInfo.distanceMeters}m</strong> ({closestStopInfo.walkMinutes} min) da parada: <strong className="text-ink">{closestStopInfo.stop.name.split(',')[0]}</strong>
             </span>
           </div>
         )}
@@ -409,14 +425,14 @@ export default function MapView({ line, details, selectedStop, onClose }) {
         <button
           onClick={handleLocateUser}
           disabled={locatingUser}
-          className={`px-3.5 py-2.5 rounded-[8px] border text-xs flex items-center gap-1.5 shadow-sm transition-all ${
+          className={`px-3.5 py-2.5 rounded-[12px] border text-xs flex items-center gap-1.5 shadow-sm transition-all ${
             userLocation
-              ? 'bg-[#e6f0ff] border-[#006bff] text-[#006bff] font-bold'
-              : 'bg-[#ffffff] hover:bg-[#f0f3f8] border-[#d4e0ed] text-[#0b3558]'
+              ? 'bg-brand-soft border-accent text-accent font-bold'
+              : 'bg-surface hover:bg-surface-2 border-line text-ink'
           }`}
           title="Detectar minha localização e achar parada mais próxima"
         >
-          <Crosshair className={`w-4 h-4 ${locatingUser ? 'animate-spin text-[#006bff]' : ''}`} />
+          <Crosshair className={`w-4 h-4 ${locatingUser ? 'animate-spin text-accent' : ''}`} />
           <span className="hidden sm:inline font-semibold">MEU GPS</span>
         </button>
 
@@ -424,21 +440,22 @@ export default function MapView({ line, details, selectedStop, onClose }) {
         <button
           onClick={() => fetchTracking(true)}
           disabled={loading}
-          className="px-3.5 py-2.5 rounded-[8px] bg-[#ffffff] hover:bg-[#f0f3f8] border border-[#d4e0ed] text-[#0b3558] transition-all flex items-center gap-1.5 text-xs shadow-sm font-medium"
+          className="px-3.5 py-2.5 rounded-[12px] bg-surface hover:bg-surface-2 border border-line text-ink transition-all flex items-center gap-1.5 text-xs shadow-sm font-medium"
           title="Atualizar telemetria"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#006bff]' : 'text-[#476788]'}`} />
-          <span className="text-xs text-[#006bff] font-bold">{syncCountdown}s</span>
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-accent' : 'text-muted'}`} />
+          <span className="text-xs text-accent font-bold">{syncCountdown}s</span>
         </button>
 
         {/* Botão Fechar (Dark CTA Calendly Style) */}
         <button
           onClick={onClose}
-          className="px-3.5 py-2.5 rounded-[8px] bg-[#0b3558] hover:bg-[#006bff] text-white transition-all shadow-sm flex items-center gap-1.5 text-xs font-semibold active:scale-95 cursor-pointer"
+          className="px-3.5 py-2.5 rounded-[12px] bg-ink hover:opacity-90 text-canvas transition-all shadow-sm flex items-center gap-1.5 text-xs font-semibold active:scale-95 cursor-pointer"
           title="Fechar mapa"
+          aria-label="Fechar mapa"
         >
-          <X className="w-4 h-4 text-white" />
-          <span>FECHAR</span>
+          <X className="w-4 h-4" />
+          <span className="hidden sm:inline">Fechar</span>
         </button>
       </div>
 
@@ -447,71 +464,71 @@ export default function MapView({ line, details, selectedStop, onClose }) {
 
       {/* Floating Bottom Telemetry Dock */}
       <div className="absolute bottom-safe-4 left-4 right-4 md:left-4 md:right-auto md:w-96 z-[2000] pointer-events-none">
-        <div className="pointer-events-auto bg-[#ffffff]/95 backdrop-blur-md border border-[#d4e0ed] rounded-[16px] p-3.5 shadow-calendly-card space-y-2.5">
+        <div className="pointer-events-auto bg-surface/95 backdrop-blur-md border border-line rounded-[20px] p-3.5 shadow-lift space-y-2.5">
           
-          <div className="flex items-center justify-between border-b border-[#d4e0ed] pb-2 text-xs">
-            <span className="text-[#006bff] font-bold flex items-center gap-1.5">
-              <Radio className="w-3.5 h-3.5 animate-pulse text-[#006bff]" />
+          <div className="flex items-center justify-between border-b border-line pb-2 text-xs">
+            <span className="text-accent font-bold flex items-center gap-1.5">
+              <Radio className="w-3.5 h-3.5 animate-pulse text-accent" />
               <span>FROTA NA ROTA ({trackingData?.vehiclesCount || 0})</span>
             </span>
-            <span className="text-[11px] text-[#476788]">
+            <span className="text-[11px] text-muted">
               Atualização em: {syncCountdown}s
             </span>
           </div>
 
           {/* Lista de Ônibus Rastreados */}
-          <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 divide-y divide-[#f0f3f8]">
+          <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 divide-y divide-surface-2">
             {trackingData?.vehicles && trackingData.vehicles.length > 0 ? (
               trackingData.vehicles.map((v, i) => (
                 <div
                   key={v.vehicleId || i}
                   onClick={() => focusOnVehicle(v)}
-                  className={`pt-1.5 first:pt-0 p-2.5 rounded-[10px] cursor-pointer transition-all flex items-center justify-between text-xs ${
+                  className={`pt-1.5 first:pt-0 p-2.5 rounded-[12px] cursor-pointer transition-all flex items-center justify-between text-xs ${
                     selectedVehicle?.vehicleId === v.vehicleId 
-                      ? 'bg-[#e6f0ff] border border-[#006bff]/50' 
-                      : 'hover:bg-[#f0f3f8] border border-transparent'
+                      ? 'bg-brand-soft border border-accent/50' 
+                      : 'hover:bg-surface-2 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-[8px] bg-[#f0f3f8] border border-[#d4e0ed] flex items-center justify-center text-[#006bff] font-bold text-xs">
+                    <div className="w-7 h-7 rounded-[12px] bg-surface-2 border border-line flex items-center justify-center text-accent font-bold text-xs">
                       <Bus className="w-3.5 h-3.5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-[#0b3558] text-xs">Ônibus #{v.vehicleId}</span>
+                        <span className="font-bold text-ink text-xs">Ônibus #{v.vehicleId}</span>
                         {v.isRealTime && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#e6f0ff] text-[#004eba] font-bold">
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-brand-soft text-accent font-bold">
                             GPS
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-[#476788] truncate max-w-[170px]">
+                      <p className="text-[11px] text-muted truncate max-w-[170px]">
                         Destino: {formatStopTargetName(v.nextStopName)}
                       </p>
                     </div>
                   </div>
 
                   <div className="text-right flex-shrink-0">
-                    <span className={`text-xs font-bold ${v.secondsUntilArrival <= 60 ? 'text-[#006bff] animate-pulse' : 'text-[#0b3558]'}`}>
+                    <span className={`text-xs font-bold ${v.secondsUntilArrival <= 60 ? 'text-accent animate-pulse' : 'text-ink'}`}>
                       {v.secondsUntilArrival <= 60 ? 'Chegando' : `${v.minutesUntilArrival} min`}
                     </span>
-                    <p className="text-[10px] text-[#a6bbd1]">
+                    <p className="text-[10px] text-faint">
                       {v.secondsUntilArrival}s
                     </p>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="py-3 text-center text-[#476788] text-xs">
+              <p className="py-3 text-center text-muted text-xs">
                 Nenhum veículo transmitindo sinal no momento.
               </p>
             )}
           </div>
 
           {/* Rodapé do Dock */}
-          <div className="flex items-center justify-between text-[11px] text-[#476788] border-t border-[#d4e0ed] pt-2">
+          <div className="flex items-center justify-between text-[11px] text-muted border-t border-line pt-2">
             <span>Clique no ônibus para centralizar</span>
-            <span className="text-[#006bff] font-semibold">Nexto</span>
+            <span className="text-accent font-semibold">Nexto</span>
           </div>
 
         </div>

@@ -8,6 +8,7 @@ import {
 import { transitAlarm } from '../utils/audioAlert';
 import { tapFeedback } from '../utils/haptics';
 import { LineDetailSkeleton, PredictionSkeleton } from './Skeleton';
+import LinePlate from './LinePlate';
 
 export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35 }) {
   const [activeLine, setActiveLine] = useState(line);
@@ -171,20 +172,18 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-center bg-[#0b3558]/40 backdrop-blur-sm animate-fade-in pt-safe md:p-6">
-      <div className="w-full md:max-w-2xl bg-[#ffffff] border-t md:border border-[#d4e0ed] rounded-t-[24px] md:rounded-[24px] shadow-calendly-card flex flex-col max-h-[92vh] md:max-h-[85vh] overflow-hidden pb-safe md:pb-0">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-center bg-scrim backdrop-blur-sm animate-fade-in pt-safe md:p-6">
+      <div className="w-full md:max-w-2xl bg-surface border-t md:border border-line rounded-t-[24px] md:rounded-[24px] shadow-lift flex flex-col max-h-[92vh] md:max-h-[85vh] overflow-hidden pb-safe md:pb-0">
         
         {/* Header Drawer */}
-        <div className="p-4 sm:p-5 border-b border-[#d4e0ed] bg-[#ffffff] flex items-center justify-between gap-3">
+        <div className="p-4 sm:p-5 border-b border-line bg-surface flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="px-3 py-1.5 rounded-[8px] bg-[#f0f3f8] border border-[#d4e0ed] text-[#006bff] font-bold text-sm tracking-wide flex-shrink-0">
-              {activeLine.routeCode || 'BUS'}
-            </div>
+            <LinePlate line={activeLine} size="lg" />
             <div className="min-w-0">
-              <h2 className="font-bold text-[#0b3558] text-base sm:text-lg truncate">
+              <h2 className="font-bold text-ink text-base sm:text-lg truncate">
                 {activeLine.routeMnemonic || 'Itinerário da Linha'}
               </h2>
-              <p className="text-xs text-[#476788] truncate">
+              <p className="text-xs text-muted truncate">
                 {activeLine.serviceMnemonic || activeLine.companyName || 'Transporte Urbano'}
               </p>
             </div>
@@ -193,16 +192,16 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
           <div className="flex items-center gap-2">
             <button
               onClick={() => onOpenMap(details, selectedStop, activeLine)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-[8px] bg-[#006bff] hover:bg-[#005ce6] text-white text-xs font-semibold transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-brand hover:bg-brand-strong text-on-brand text-xs font-bold whitespace-nowrap transition-colors"
               title="Abrir mapa com localização de todos os ônibus"
             >
-              <Navigation className="w-4 h-4 text-white" />
-              <span>VER MAPA</span>
+              <Navigation className="w-4 h-4 text-on-brand" />
+              <span>Mapa</span>
             </button>
 
             <button
               onClick={onClose}
-              className="p-2 rounded-[8px] text-[#476788] hover:text-[#0b3558] hover:bg-[#f0f3f8] transition-colors"
+              className="p-2 rounded-[12px] text-muted hover:text-ink hover:bg-surface-2 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -211,9 +210,9 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
 
         {/* Seletor de Sentido (Ida / Volta) */}
         {pairedLines.length > 1 && (
-          <div className="px-5 py-2.5 bg-[#f8f9fb] border-b border-[#d4e0ed] flex items-center gap-2 overflow-x-auto whitespace-nowrap">
-            <span className="text-xs text-[#476788] font-semibold flex items-center gap-1.5 flex-shrink-0">
-              <ArrowLeftRight className="w-3.5 h-3.5 text-[#006bff]" />
+          <div className="px-5 py-2.5 bg-canvas border-b border-line flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+            <span className="text-xs text-muted font-semibold flex items-center gap-1.5 flex-shrink-0">
+              <ArrowLeftRight className="w-3.5 h-3.5 text-accent" />
               <span>SENTIDO:</span>
             </span>
             <div className="flex items-center gap-2">
@@ -225,10 +224,10 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
                     onClick={() => {
                       if (!isCurrent) setActiveLine(pl);
                     }}
-                    className={`px-3 py-1 rounded-[8px] text-xs font-medium transition-all ${
+                    className={`px-3 py-1 rounded-[12px] text-xs font-medium transition-all ${
                       isCurrent
-                        ? 'bg-[#006bff] text-white font-semibold shadow-sm'
-                        : 'bg-[#ffffff] text-[#0b3558] hover:bg-[#f0f3f8] border border-[#d4e0ed]'
+                        ? 'bg-brand text-on-brand font-semibold shadow-sm'
+                        : 'bg-surface text-ink hover:bg-surface-2 border border-line'
                     }`}
                   >
                     {pl.serviceMnemonic || pl.routeMnemonic}
@@ -240,12 +239,12 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
         )}
 
         {/* Telemetry Status Bar */}
-        <div className="px-5 py-2.5 bg-[#f0f3f8] border-b border-[#d4e0ed] flex items-center justify-between text-xs text-[#476788]">
+        <div className="px-5 py-2.5 bg-surface-2 border-b border-line flex items-center justify-between text-xs text-muted">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#006bff]"></span>
-            <span>TELEMETRIA: <strong className="text-[#0b3558]">AO VIVO</strong></span>
+            <span className="w-2 h-2 rounded-full bg-brand"></span>
+            <span>TELEMETRIA: <strong className="text-ink">AO VIVO</strong></span>
             {lastUpdated && (
-              <span className="text-[#a6bbd1] hidden sm:inline">
+              <span className="text-faint hidden sm:inline">
                 [{lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
               </span>
             )}
@@ -253,8 +252,8 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
 
           <div className="flex items-center gap-3">
             {alarmTarget && (
-              <span className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
-                <BellRing className="w-3 h-3 text-amber-600" />
+              <span className="text-xs font-semibold text-warn bg-warn-soft border border-warn/40 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                <BellRing className="w-3 h-3 text-warn" />
                 <span>ALARME #{alarmTarget}</span>
               </span>
             )}
@@ -262,7 +261,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
             <button
               onClick={() => fetchPredictions(selectedStop, true)}
               disabled={predLoading}
-              className="flex items-center gap-1 text-[#006bff] hover:text-[#005ce6] font-semibold transition-colors"
+              className="flex items-center gap-1 text-accent hover:text-accent font-semibold transition-colors"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${predLoading ? 'animate-spin' : ''}`} />
               <span>ATUALIZAR</span>
@@ -276,40 +275,40 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
           {loading ? (
             <LineDetailSkeleton />
           ) : error ? (
-            <div className="p-4 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500" />
+            <div className="p-4 rounded-[12px] bg-danger-soft border border-danger/30 text-danger text-xs flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-danger" />
               <span>{error}</span>
             </div>
           ) : (
             <>
               {/* Painel da Parada Ativa */}
               {selectedStop && (
-                <div className="bg-[#f8f9fb] border border-[#d4e0ed] rounded-[16px] p-4 space-y-3.5 shadow-calendly-sm">
-                  <div className="flex items-start justify-between gap-2 border-b border-[#d4e0ed] pb-3">
+                <div className="bg-canvas border border-line rounded-[20px] p-4 space-y-3.5 shadow-soft">
+                  <div className="flex items-start justify-between gap-2 border-b border-line pb-3">
                     <div>
-                      <span className="text-[11px] text-[#006bff] font-bold uppercase tracking-wider">
+                      <span className="text-[11px] text-accent font-bold uppercase tracking-wider">
                         PARADA SELECIONADA #{selectedStop.index + 1}
                       </span>
-                      <h3 className="font-bold text-[#0b3558] text-sm sm:text-base mt-0.5 leading-snug">
+                      <h3 className="font-bold text-ink text-sm sm:text-base mt-0.5 leading-snug">
                         {selectedStop.name}
                       </h3>
-                      <p className="text-[11px] text-[#476788] mt-0.5">Identificador: {selectedStop.stopId}</p>
+                      <p className="text-[11px] text-muted mt-0.5">Identificador: {selectedStop.stopId}</p>
                     </div>
 
                     <button
                       onClick={() => onOpenMap(details, selectedStop, activeLine)}
-                      className="px-3 py-1.5 rounded-[8px] bg-[#ffffff] hover:bg-[#f0f3f8] border border-[#d4e0ed] text-xs font-semibold text-[#006bff] flex items-center gap-1.5 shadow-sm transition-all flex-shrink-0"
+                      className="px-3 py-1.5 rounded-[12px] bg-surface hover:bg-surface-2 border border-line text-xs font-semibold text-accent flex items-center gap-1.5 shadow-sm transition-all flex-shrink-0"
                     >
-                      <Map className="w-3.5 h-3.5 text-[#006bff]" />
+                      <Map className="w-3.5 h-3.5 text-accent" />
                       <span>Ver no Mapa</span>
                     </button>
                   </div>
 
                   {/* Veículos em Aproximação */}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-[#476788]">
-                      <span className="flex items-center gap-1.5 font-semibold text-[#0b3558]">
-                        <Activity className="w-4 h-4 text-[#006bff]" />
+                    <div className="flex items-center justify-between text-xs text-muted">
+                      <span className="flex items-center gap-1.5 font-semibold text-ink">
+                        <Activity className="w-4 h-4 text-accent" />
                         <span>ÔNIBUS A CAMINHO</span>
                       </span>
                       {predictions?.vehicles && (
@@ -331,34 +330,34 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
                               key={idx}
                               className={`p-3.5 rounded-[12px] border transition-all space-y-2.5 ${
                                 isAlarmActive
-                                  ? 'bg-amber-50/60 border-amber-300'
+                                  ? 'bg-warn-soft border-warn/40'
                                   : v.isRealTime 
-                                    ? 'bg-[#ffffff] border-[#006bff]/30 shadow-calendly-sm' 
-                                    : 'bg-[#ffffff] border-[#d4e0ed]'
+                                    ? 'bg-surface border-accent/30 shadow-soft' 
+                                    : 'bg-surface border-line'
                               }`}
                             >
                               <div className="flex items-center justify-between">
                                 <div>
                                   <div className="flex items-center gap-2">
-                                    <span className="font-bold text-[#0b3558] text-sm">
+                                    <span className="font-bold text-ink text-sm">
                                       Prefixo #{v.vehicleId || 'N/A'}
                                     </span>
                                     {v.isRealTime && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#e6f0ff] text-[#004eba] font-bold">
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-soft text-accent font-bold">
                                         GPS AO VIVO
                                       </span>
                                     )}
                                     {crowd?.level && crowd.level !== 'unknown' && (
                                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                                        crowd.level === 'low' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                        crowd.level === 'medium' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                                        'bg-rose-50 text-rose-700 border border-rose-200'
+                                        crowd.level === 'low' ? 'bg-success-soft text-success border border-success/40' :
+                                        crowd.level === 'medium' ? 'bg-warn-soft text-warn border border-warn/40' :
+                                        'bg-danger-soft text-danger border border-danger/30'
                                       }`}>
                                         {crowd.label}
                                       </span>
                                     )}
                                   </div>
-                                  <span className="text-xs text-[#476788]">
+                                  <span className="text-xs text-muted">
                                     {v.isRealTime ? 'Rastreamento por satélite ativo' : 'Horário programado da tabela'}
                                   </span>
                                 </div>
@@ -366,37 +365,37 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
                                 <div className="text-right">
                                   <p className={`text-base font-extrabold ${
                                     isApproaching 
-                                      ? 'text-[#006bff] animate-pulse' 
-                                      : 'text-[#0b3558]'
+                                      ? 'text-accent animate-pulse' 
+                                      : 'text-ink'
                                   }`}>
                                     {isApproaching ? 'CHEGANDO' : `${Math.ceil(v.secondsUntilArrival / 60)} min`}
                                   </p>
-                                  <p className="text-[11px] text-[#476788]">
+                                  <p className="text-[11px] text-muted">
                                     {v.secondsUntilArrival}s restantes
                                   </p>
                                 </div>
                               </div>
 
                               {/* Ações: Alarme & Reporte de Lotação */}
-                              <div className="pt-2 border-t border-[#d4e0ed]/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="pt-2 border-t border-line/70 flex flex-wrap items-center justify-between gap-2 text-xs">
                                 {/* Botão de Alarme */}
                                 <button
                                   onClick={() => toggleAlarm(v.vehicleId)}
-                                  className={`px-3 py-1 rounded-[8px] flex items-center gap-1.5 transition-all text-xs font-semibold ${
+                                  className={`px-3 py-1 rounded-[12px] flex items-center gap-1.5 transition-all text-xs font-semibold ${
                                     isAlarmActive
-                                      ? 'bg-amber-500 text-white shadow-sm'
-                                      : 'bg-[#ffffff] hover:bg-[#f0f3f8] text-[#0b3558] border border-[#d4e0ed]'
+                                      ? 'bg-warn text-surface shadow-sm'
+                                      : 'bg-surface hover:bg-surface-2 text-ink border border-line'
                                   }`}
                                   title="Avisar com som e vibração quando o ônibus estiver a 3 min"
                                 >
                                   {isAlarmActive ? (
                                     <>
-                                      <BellRing className="w-3.5 h-3.5 text-white animate-pulse" />
+                                      <BellRing className="w-3.5 h-3.5 text-surface animate-pulse" />
                                       <span>ALARME ATIVO</span>
                                     </>
                                   ) : (
                                     <>
-                                      <Bell className="w-3.5 h-3.5 text-[#476788]" />
+                                      <Bell className="w-3.5 h-3.5 text-muted" />
                                       <span>AVISAR QUANDO CHEGAR</span>
                                     </>
                                   )}
@@ -404,24 +403,24 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
 
                                 {/* Votação de Lotação */}
                                 <div className="flex items-center gap-1 text-[11px]">
-                                  <span className="text-[#476788] font-medium mr-0.5">LOTAÇÃO:</span>
+                                  <span className="text-muted font-medium mr-0.5">LOTAÇÃO:</span>
                                   <button
                                     onClick={() => handleVoteCrowding(v.vehicleId, 'low')}
-                                    className="px-2 py-0.5 rounded-[6px] bg-[#ffffff] hover:bg-emerald-50 text-emerald-700 border border-[#d4e0ed] transition-colors"
+                                    className="px-2 py-0.5 rounded-[8px] bg-surface hover:bg-success-soft text-success border border-line transition-colors"
                                     title="Vazio / Assentos livres"
                                   >
                                     Vazio
                                   </button>
                                   <button
                                     onClick={() => handleVoteCrowding(v.vehicleId, 'medium')}
-                                    className="px-2 py-0.5 rounded-[6px] bg-[#ffffff] hover:bg-amber-50 text-amber-700 border border-[#d4e0ed] transition-colors"
+                                    className="px-2 py-0.5 rounded-[8px] bg-surface hover:bg-warn-soft text-warn border border-line transition-colors"
                                     title="Moderado / Apenas em pé"
                                   >
                                     Médio
                                   </button>
                                   <button
                                     onClick={() => handleVoteCrowding(v.vehicleId, 'high')}
-                                    className="px-2 py-0.5 rounded-[6px] bg-[#ffffff] hover:bg-rose-50 text-rose-700 border border-[#d4e0ed] transition-colors"
+                                    className="px-2 py-0.5 rounded-[8px] bg-surface hover:bg-danger-soft text-danger border border-line transition-colors"
                                     title="Lotado / Capacidade máxima"
                                   >
                                     Lotado
@@ -433,7 +432,7 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
                         })}
                       </div>
                     ) : (
-                      <div className="p-4 rounded-[12px] bg-[#ffffff] border border-[#d4e0ed] text-center text-xs text-[#476788]">
+                      <div className="p-4 rounded-[12px] bg-surface border border-line text-center text-xs text-muted">
                         Nenhum veículo em rota para esta parada neste instante.
                       </div>
                     )}
@@ -441,16 +440,16 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
 
                   {/* Grade de Partidas */}
                   {selectedStop.departures && selectedStop.departures.length > 0 && (
-                    <div className="pt-2 border-t border-[#d4e0ed]">
-                      <p className="text-xs font-semibold text-[#476788] mb-1.5 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-[#006bff]" />
+                    <div className="pt-2 border-t border-line">
+                      <p className="text-xs font-semibold text-muted mb-1.5 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-accent" />
                         <span>Partidas Programadas Hoje ({selectedStop.departures.length})</span>
                       </p>
                       <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1">
                         {selectedStop.departures.map((t, idx) => (
                           <span 
                             key={idx}
-                            className="px-2 py-0.5 rounded-[6px] bg-[#ffffff] border border-[#d4e0ed] text-[#0b3558] text-xs font-medium"
+                            className="px-2 py-0.5 rounded-[8px] bg-surface border border-line text-ink text-xs font-medium"
                           >
                             {t}
                           </span>
@@ -463,12 +462,12 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
 
               {/* Lista Completa de Paradas da Linha */}
               <div className="space-y-2 pt-2">
-                <div className="flex items-center justify-between text-xs text-[#476788] px-1">
-                  <span className="font-semibold text-[#0b3558]">Todas as Paradas ({details?.stops?.length || 0})</span>
-                  <span className="text-[#006bff]">Clique para selecionar</span>
+                <div className="flex items-center justify-between text-xs text-muted px-1">
+                  <span className="font-semibold text-ink">Todas as Paradas ({details?.stops?.length || 0})</span>
+                  <span className="text-accent">Clique para selecionar</span>
                 </div>
 
-                <div className="divide-y divide-[#f0f3f8] rounded-[16px] bg-[#ffffff] border border-[#d4e0ed] overflow-hidden shadow-calendly-sm">
+                <div className="divide-y divide-surface-2 rounded-[20px] bg-surface border border-line overflow-hidden shadow-soft">
                   {details?.stops?.map((stop, idx) => {
                     const isSelected = selectedStop?.stopId === stop.stopId;
                     return (
@@ -477,27 +476,27 @@ export default function LineDetailDrawer({ line, onClose, onOpenMap, cityId = 35
                         onClick={() => setSelectedStop(stop)}
                         className={`w-full text-left p-3.5 flex items-center gap-3 transition-colors text-xs ${
                           isSelected 
-                            ? 'bg-[#e6f0ff] border-l-4 border-l-[#006bff]' 
-                            : 'hover:bg-[#f0f3f8]'
+                            ? 'bg-brand-soft border-l-4 border-l-accent' 
+                            : 'hover:bg-surface-2'
                         }`}
                       >
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                           isSelected 
-                            ? 'bg-[#006bff] text-white' 
-                            : 'bg-[#f0f3f8] text-[#476788] border border-[#d4e0ed]'
+                            ? 'bg-brand text-on-brand' 
+                            : 'bg-surface-2 text-muted border border-line'
                         }`}>
                           {idx + 1}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className={`truncate text-sm ${isSelected ? 'text-[#006bff] font-bold' : 'text-[#0b3558] font-medium'}`}>
+                          <p className={`truncate text-sm ${isSelected ? 'text-accent font-bold' : 'text-ink font-medium'}`}>
                             {stop.name}
                           </p>
-                          <p className="text-[11px] text-[#476788]">
+                          <p className="text-[11px] text-muted">
                             {stop.departures?.length || 0} partidas programadas
                           </p>
                         </div>
                         {isSelected && (
-                          <CheckCircle2 className="w-4 h-4 text-[#006bff] flex-shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
                         )}
                       </button>
                     );
