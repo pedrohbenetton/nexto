@@ -11,6 +11,7 @@ import { tapFeedback } from '../utils/haptics';
 import { isStopSaved, toSavedStop } from '../utils/savedStops';
 import { LineDetailSkeleton, PredictionSkeleton } from './Skeleton';
 import LinePlate from './LinePlate';
+import ReliabilityBadge from './ReliabilityBadge';
 
 export default function LineDetailDrawer({
   line, onClose, onOpenMap, cityId = 35, initialStopId, savedStops = [], onToggleSavedStop,
@@ -358,6 +359,8 @@ export default function LineDetailDrawer({
                         <span>{predictions.vehicles.length} veículo(s)</span>
                       )}
                     </div>
+
+                    <ReliabilityBadge serviceId={details.serviceId} stopId={selectedStop.stopId} />
 
                     {predLoading ? (
                       <PredictionSkeleton count={2} />

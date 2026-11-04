@@ -3,6 +3,7 @@ import { BookmarkX, MapPin } from 'lucide-react';
 import { apiUrl } from '../utils/api';
 import { savedStopKey, upcomingArrivals } from '../utils/savedStops';
 import LinePlate from './LinePlate';
+import ReliabilityBadge from './ReliabilityBadge';
 import { SkeletonBlock } from './Skeleton';
 
 const REFRESH_MS = 20000;
@@ -128,6 +129,7 @@ export default function MyStops({ savedStops, onOpen, onRemove }) {
                     {entry.line.routeMnemonic}
                     {entry.line.serviceMnemonic && ` → ${entry.line.serviceMnemonic}`}
                   </p>
+                  <ReliabilityBadge serviceId={entry.serviceId} stopId={entry.stopId} short className="mt-1" />
                 </div>
                 <Arrivals state={departures[key]} />
               </button>
