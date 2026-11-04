@@ -1,7 +1,44 @@
+const MIN = 60 * 1000;
+// Tipos de relato: ttl em ms e rótulo. Relatos de ônibus valem 35 min; de ponto, 3 h.
+const ISSUE_TYPES = {
+  no_ac: { label: 'AR-CONDICIONADO NÃO FUNCIONA', ttl: 35 * MIN },
+  broken: { label: 'ÔNIBUS COM DEFEITO', ttl: 35 * MIN },
+  unsafe_night: { label: 'PONTO INSEGURO À NOITE', ttl: 180 * MIN }
+};
+
 // Registro em Memória de Lotação Colaborativa de Frota (Crowdsourcing)
 class CrowdingRegistry {
   constructor() {
     this.reports = new Map(); // vehicleId -> { reports: [{ level, timestamp }] }
+    this.issues = new Map(); // subjectId -> [{ type, timestamp }]
+  }
+
+  // Registrar relato de problema (veículo ou ponto). Retorna false se o tipo for inválido.
+  addIssue(subjectId, type) {
+    if (!subjectId || !ISSUE_TYPES[type]) return false;
+    const now = Date.now();
+    const key = String(subjectId);
+    const list = (this.issues.get(key) || []).filter(r => now - r.timestamp < ISSUE_TYPES[r.type].ttl);
+    list.push({ type, timestamp: now });
+    this.issues.set(key, list);
+    return true;
+  }
+
+  // Relatos válidos agregados por tipo: [{ type, label, count, lastReportAt }]
+  getIssues(subjectId) {
+    const now = Date.now();
+    const valid = (this.issues.get(String(subjectId)) || [])
+      .filter(r => now - r.timestamp < ISSUE_TYPES[r.type].ttl);
+    return Object.keys(ISSUE_TYPES).flatMap(type => {
+      const hits = valid.filter(r => r.type === type);
+      if (!hits.length) return [];
+      return [{
+        type,
+        label: ISSUE_TYPES[type].label,
+        count: hits.length,
+        lastReportAt: new Date(hits[hits.length - 1].timestamp).toISOString()
+      }];
+    });
   }
 
   // Registrar reporte do usuário (level: 'low' | 'medium' | 'high')

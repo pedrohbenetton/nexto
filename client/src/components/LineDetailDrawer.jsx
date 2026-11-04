@@ -12,6 +12,7 @@ import { isStopSaved, toSavedStop } from '../utils/savedStops';
 import { LineDetailSkeleton, PredictionSkeleton } from './Skeleton';
 import LinePlate from './LinePlate';
 import ReliabilityBadge from './ReliabilityBadge';
+import IssueReports from './IssueReports';
 
 export default function LineDetailDrawer({
   line, onClose, onOpenMap, cityId = 35, initialStopId, savedStops = [], onToggleSavedStop,
@@ -496,6 +497,7 @@ export default function LineDetailDrawer({
                                     Lotado
                                   </button>
                                 </div>
+                                <IssueReports subjectId={v.vehicleId} types={['no_ac', 'broken']} />
                               </div>
                             </div>
                           );
@@ -507,6 +509,8 @@ export default function LineDetailDrawer({
                       </div>
                     )}
                   </div>
+
+                  <IssueReports subjectId={`stop-${selectedStop.stopId}`} types={['unsafe_night']} />
 
                   {/* Grade de Partidas */}
                   {selectedStop.departures && selectedStop.departures.length > 0 && (

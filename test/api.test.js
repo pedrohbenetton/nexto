@@ -282,3 +282,23 @@ describe('/api/crowding', () => {
     assert.equal(body.data.level, 'unknown');
   });
 });
+
+describe('/api/issues', () => {
+  test('400 sem subjectId ou type, ou com type inválido', async () => {
+    assert.equal((await api.post('/issues/report', { subjectId: 'x' })).status, 400);
+    assert.equal((await api.post('/issues/report', { subjectId: 'x', type: 'nada' })).status, 400);
+  });
+
+  test('registra relato e consulta', async () => {
+    const r = await json(api.post('/issues/report', { subjectId: 8001, type: 'no_ac' }));
+    assert.equal(r.status, 200);
+    assert.equal(r.body.data[0].type, 'no_ac');
+    const { body } = await json(api.get('/issues/8001'));
+    assert.equal(body.data[0].count, 1);
+  });
+
+  test('sujeito sem relatos retorna lista vazia', async () => {
+    const { body } = await json(api.get('/issues/ninguem'));
+    assert.deepEqual(body.data, []);
+  });
+});

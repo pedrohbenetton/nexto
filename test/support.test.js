@@ -72,6 +72,39 @@ describe('CrowdingRegistry', () => {
   });
 });
 
+describe('CrowdingRegistry - relatos de problemas', () => {
+  test('sem relatos retorna lista vazia', () => {
+    assert.deepEqual(crowding.getIssues('v-limpo'), []);
+  });
+
+  test('ignora tipo inválido', () => {
+    assert.equal(crowding.addIssue('v-x', 'explodiu'), false);
+    assert.deepEqual(crowding.getIssues('v-x'), []);
+  });
+
+  test('agrega contagem por tipo', () => {
+    crowding.addIssue('v-ac', 'no_ac');
+    crowding.addIssue('v-ac', 'no_ac');
+    crowding.addIssue('v-ac', 'broken');
+    const issues = crowding.getIssues('v-ac');
+    const ac = issues.find(i => i.type === 'no_ac');
+    assert.equal(ac.count, 2);
+    assert.equal(ac.label, 'AR-CONDICIONADO NÃO FUNCIONA');
+    assert.equal(issues.find(i => i.type === 'broken').count, 1);
+  });
+
+  test('relatos de ônibus expiram em 35 min; de ponto, em 3 h', t => {
+    t.mock.timers.enable({ apis: ['Date'], now: 0 });
+    crowding.addIssue('v-exp', 'broken');
+    crowding.addIssue('p-exp', 'unsafe_night');
+    t.mock.timers.tick(35 * 60 * 1000);
+    assert.deepEqual(crowding.getIssues('v-exp'), []);
+    assert.equal(crowding.getIssues('p-exp').length, 1);
+    t.mock.timers.tick(3 * 60 * 60 * 1000);
+    assert.deepEqual(crowding.getIssues('p-exp'), []);
+  });
+});
+
 describe('nearbyStops', () => {
   test('haversineDistance retorna 0 para o mesmo ponto', () => {
     assert.equal(haversineDistance(-23.5, -47.4, -23.5, -47.4), 0);

@@ -275,6 +275,19 @@ router.post('/crowding/report', (req, res) => {
   }
 });
 
+// Relatos de problemas (ar-condicionado, ônibus quebrado, ponto inseguro)
+router.post('/issues/report', (req, res) => {
+  const { subjectId, type } = req.body || {};
+  if (!subjectId || !crowding.addIssue(String(subjectId), type)) {
+    return res.status(400).json({ error: 'subjectId e type (no_ac|broken|unsafe_night) são obrigatórios' });
+  }
+  res.json({ success: true, data: crowding.getIssues(String(subjectId)) });
+});
+
+router.get('/issues/:subjectId', (req, res) => {
+  res.json({ success: true, data: crowding.getIssues(String(req.params.subjectId)) });
+});
+
 router.get('/crowding/:vehicleId', (req, res) => {
   try {
     const { vehicleId } = req.params;
