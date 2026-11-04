@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const citta = require('../cittamobiService');
 const crowding = require('../crowdingRegistry');
+const predictionHistory = require('../predictionHistory');
 const providerRegistry = require('../providers/ProviderRegistry');
 const nearbyStops = require('../nearbyStops');
 
@@ -164,11 +165,26 @@ router.get('/predictions', async (req, res) => {
       return res.status(400).json({ error: 'serviceId e stopId são obrigatórios' });
     }
     const predictions = await citta.getStopPredictions(serviceId, stopId);
+    try {
+      predictionHistory.record(serviceId, stopId, predictions.vehicles);
+    } catch (e) {
+      console.error('Erro ao registrar histórico:', e.message);
+    }
     res.json({ success: true, data: predictions });
   } catch (error) {
     console.error('Erro ao buscar previsões:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// Confiabilidade histórica da linha numa parada (?serviceId=&stopId=&hour=)
+router.get('/reliability', (req, res) => {
+  const { serviceId, stopId } = req.query;
+  if (!serviceId || !stopId) {
+    return res.status(400).json({ error: 'serviceId e stopId são obrigatórios' });
+  }
+  const hour = req.query.hour === undefined ? undefined : Number(req.query.hour);
+  res.json({ success: true, data: predictionHistory.getReliability(serviceId, stopId, hour) });
 });
 
 // 5. Autocomplete de endereços e paradas

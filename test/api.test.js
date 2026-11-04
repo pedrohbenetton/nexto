@@ -169,6 +169,28 @@ describe('GET /api/lines/tracking', () => {
   });
 });
 
+describe('GET /api/reliability', () => {
+  test('400 sem serviceId ou stopId', async () => {
+    assert.equal((await api.get('/reliability?serviceId=1')).status, 400);
+    assert.equal((await api.get('/reliability?stopId=1')).status, 400);
+  });
+
+  test('sem histórico devolve unknown', async () => {
+    const { status, body } = await json(api.get('/reliability?serviceId=nunca&stopId=visto'));
+    assert.equal(status, 200);
+    assert.equal(body.data.level, 'unknown');
+  });
+
+  test('/predictions alimenta o histórico sem alterar a resposta', async t => {
+    const history = require('../server/predictionHistory');
+    const rec = t.mock.method(history, 'record');
+    t.mock.method(cittaService, 'getStopPredictions', async () => ({ vehicles: [{ vehicleId: 'a' }] }));
+    const { body } = await json(api.get('/predictions?serviceId=10&stopId=20'));
+    assert.deepEqual(body, { success: true, data: { vehicles: [{ vehicleId: 'a' }] } });
+    assert.deepEqual(rec.mock.calls[0].arguments, ['10', '20', [{ vehicleId: 'a' }]]);
+  });
+});
+
 describe('GET /api/predictions', () => {
   test('400 sem serviceId ou stopId', async () => {
     assert.equal((await api.get('/predictions?serviceId=1')).status, 400);
