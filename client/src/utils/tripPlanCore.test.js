@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   shortPlaceName, needsResolve, buildTripPath, formatDuration, formatClock,
-  summarizeItinerary, describeLeg, itineraryPoints
+  summarizeItinerary, describeLeg, itineraryPoints, resolveTripTime
 } from './tripPlanCore.js';
 
 describe('shortPlaceName', () => {
@@ -95,5 +95,30 @@ describe('itineraryPoints', () => {
   test('junta os pontos de todas as pernas', () => {
     const pts = itineraryPoints({ legs: [{ path: [[1, 2], [3, 4]] }, { path: [[5, 6]] }, {}] });
     assert.deepEqual(pts, [[1, 2], [3, 4], [5, 6]]);
+  });
+});
+
+describe('resolveTripTime', () => {
+  const now = new Date(2026, 10, 5, 14, 30).getTime();
+
+  test('"now" não envia dateTime nem arriveBy', () => {
+    assert.deepEqual(resolveTripTime({ mode: 'now', clock: '', now }), { dateTime: undefined, arriveBy: false });
+  });
+
+  test('hoje, quando o horário ainda não passou', () => {
+    const r = resolveTripTime({ mode: 'depart', clock: '18:00', now });
+    assert.equal(r.dateTime, new Date(2026, 10, 5, 18, 0).getTime());
+    assert.equal(r.arriveBy, false);
+  });
+
+  test('amanhã, quando o horário já passou', () => {
+    const r = resolveTripTime({ mode: 'arrive', clock: '08:15', now });
+    assert.equal(r.dateTime, new Date(2026, 10, 6, 8, 15).getTime());
+    assert.equal(r.arriveBy, true);
+  });
+
+  test('horário inválido cai em "agora"', () => {
+    assert.deepEqual(resolveTripTime({ mode: 'depart', clock: '99:99', now }), { dateTime: undefined, arriveBy: false });
+    assert.deepEqual(resolveTripTime({ mode: 'depart', clock: '', now }), { dateTime: undefined, arriveBy: false });
   });
 });

@@ -3,7 +3,7 @@ import { X, ArrowUpDown, Route, Footprints, Clock, AlertCircle, ChevronRight, Bu
 import { apiUrl } from '../utils/api';
 import { tapFeedback } from '../utils/haptics';
 import {
-  buildTripPath, formatDuration, formatClock, summarizeItinerary, describeLeg
+  buildTripPath, resolveTripTime, formatDuration, formatClock, summarizeItinerary, describeLeg
 } from '../utils/tripPlanCore';
 import PlaceInput from './PlaceInput';
 import LinePlate from './LinePlate';
@@ -18,10 +18,13 @@ export default function TripPlannerModal({ isOpen, onClose, cityName }) {
   const [error, setError] = useState(null);
   const [plan, setPlan] = useState(null);
   const [selected, setSelected] = useState(0);
+  const [timeMode, setTimeMode] = useState('now');
+  const [clock, setClock] = useState('');
 
   if (!isOpen) return null;
 
-  const canSearch = Boolean(from && to) && !loading;
+  const timeOk = timeMode === 'now' || Boolean(clock);
+  const canSearch = Boolean(from && to) && timeOk && !loading;
 
   const search = async () => {
     tapFeedback();
@@ -30,7 +33,7 @@ export default function TripPlannerModal({ isOpen, onClose, cityName }) {
     setPlan(null);
     setSelected(0);
     try {
-      const res = await fetch(apiUrl(buildTripPath({ from, to })));
+      const res = await fetch(apiUrl(buildTripPath({ from, to, ...resolveTripTime({ mode: timeMode, clock }) })));
       const json = await res.json();
       if (json.success) {
         setPlan(json.data);
@@ -89,6 +92,32 @@ export default function TripPlannerModal({ isOpen, onClose, cityName }) {
             </button>
           </div>
           <PlaceInput label="Destino" value={to} onChange={setTo} placeholder="Para onde você vai?" cityName={cityName} />
+
+          <div>
+            <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted mb-1">Horário</span>
+            <div className="flex items-center gap-1.5">
+              {[['now', 'Agora'], ['depart', 'Sair às'], ['arrive', 'Chegar às']].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTimeMode(id)}
+                  aria-pressed={timeMode === id}
+                  className={`h-9 px-3 rounded-full border text-xs font-semibold transition-colors ${timeMode === id ? 'border-brand bg-brand-soft text-ink' : 'border-line text-muted hover:text-ink'}`}
+                >
+                  {label}
+                </button>
+              ))}
+              {timeMode !== 'now' && (
+                <input
+                  type="time"
+                  value={clock}
+                  onChange={(e) => setClock(e.target.value)}
+                  aria-label="Horário"
+                  className="h-9 px-2.5 rounded-[12px] bg-surface-2 border border-line text-sm text-ink focus:outline-none focus:border-brand"
+                />
+              )}
+            </div>
+          </div>
 
           <button
             type="button"

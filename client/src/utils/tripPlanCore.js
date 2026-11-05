@@ -55,3 +55,19 @@ export function describeLeg(leg) {
 export function itineraryPoints(itinerary) {
   return (itinerary.legs || []).flatMap(l => l.path || []);
 }
+
+// Converte a escolha de horário da UI em { dateTime(ms), arriveBy }.
+// mode: 'now' | 'depart' | 'arrive'; clock: "HH:MM". Se o horário já passou hoje, vale amanhã.
+export function resolveTripTime({ mode, clock, now = Date.now() }) {
+  const none = { dateTime: undefined, arriveBy: false };
+  if (mode !== 'depart' && mode !== 'arrive') return none;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(clock || '');
+  if (!m) return none;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return none;
+  const target = new Date(now);
+  target.setHours(h, min, 0, 0);
+  if (target.getTime() <= now) target.setDate(target.getDate() + 1);
+  return { dateTime: target.getTime(), arriveBy: mode === 'arrive' };
+}
