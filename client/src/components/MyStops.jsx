@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { BookmarkX, MapPin } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { BookmarkX, MapPin, WifiOff } from 'lucide-react';
 import { apiUrl } from '../utils/api';
 import { savedStopKey, upcomingArrivals } from '../utils/savedStops';
+import { putSnapshot, projectSnapshot, pruneSnapshots, loadSnapshots, storeSnapshots } from '../utils/offlineArrivals';
+import { formatClock } from '../utils/tripPlanCore';
 import LinePlate from './LinePlate';
 import ReliabilityBadge from './ReliabilityBadge';
 import { SkeletonBlock } from './Skeleton';
@@ -11,11 +13,19 @@ const REFRESH_MS = 20000;
 // Previsões ao vivo de cada ponto salvo; pausa quando o app vai para segundo plano
 function useStopDepartures(savedStops) {
   const [departures, setDepartures] = useState({});
+  const snapshots = useRef(pruneSnapshots(loadSnapshots(), savedStops.map(savedStopKey)));
   const keys = savedStops.map(savedStopKey).join('|');
 
   useEffect(() => {
     if (savedStops.length === 0) return undefined;
     let cancelled = false;
+
+    const offlineState = (key) => {
+      const projected = projectSnapshot(snapshots.current[key]);
+      return projected
+        ? { status: 'offline', arrivals: projected.arrivals, at: projected.at }
+        : { status: 'error', arrivals: [] };
+    };
 
     const load = () => {
       if (document.visibilityState === 'hidden') return;
@@ -27,15 +37,17 @@ function useStopDepartures(savedStops) {
           ));
           const json = await res.json();
           if (cancelled) return;
-          setDepartures(prev => ({
-            ...prev,
-            [key]: json.success
-              ? { status: 'ok', arrivals: upcomingArrivals(json.data, 3) }
-              : { status: 'error', arrivals: prev[key]?.arrivals || [] }
-          }));
+          if (json.success) {
+            const arrivals = upcomingArrivals(json.data, 3);
+            snapshots.current = putSnapshot(snapshots.current, key, arrivals);
+            storeSnapshots(snapshots.current);
+            setDepartures(prev => ({ ...prev, [key]: { status: 'ok', arrivals } }));
+          } else {
+            setDepartures(prev => ({ ...prev, [key]: offlineState(key) }));
+          }
         } catch {
           if (!cancelled) {
-            setDepartures(prev => ({ ...prev, [key]: { status: 'error', arrivals: prev[key]?.arrivals || [] } }));
+            setDepartures(prev => ({ ...prev, [key]: offlineState(key) }));
           }
         }
       });
@@ -77,6 +89,11 @@ function Arrivals({ state }) {
 
   return (
     <div className="text-right">
+      {state.status === 'offline' && (
+        <p className="mb-0.5 flex items-center justify-end gap-1 text-[10px] font-semibold uppercase tracking-wide text-warn">
+          <WifiOff className="w-3 h-3" />offline · {formatClock(state.at)}
+        </p>
+      )}
       <p className="flex items-center justify-end gap-1.5">
         {next.isRealTime && (
           <span className="relative flex w-2 h-2" title="Posição ao vivo (GPS)">
