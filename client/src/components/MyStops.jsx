@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookmarkX, MapPin, WifiOff } from 'lucide-react';
+import { BookmarkX, MapPin, WifiOff, Pin, PinOff } from 'lucide-react';
 import { apiUrl } from '../utils/api';
 import { savedStopKey, upcomingArrivals } from '../utils/savedStops';
 import { putSnapshot, projectSnapshot, pruneSnapshots, loadSnapshots, storeSnapshots } from '../utils/offlineArrivals';
 import { formatClock } from '../utils/tripPlanCore';
+import { canPinNotifications, updatePinned, clearPinned } from '../utils/pinnedNotification';
+import { tapFeedback } from '../utils/haptics';
 import LinePlate from './LinePlate';
 import ReliabilityBadge from './ReliabilityBadge';
 import { SkeletonBlock } from './Skeleton';
@@ -116,6 +118,32 @@ function Arrivals({ state }) {
 
 export default function MyStops({ savedStops, onOpen, onRemove }) {
   const departures = useStopDepartures(savedStops);
+  const [pinned, setPinned] = useState({}); // key -> true
+  const nativePin = canPinNotifications();
+
+  // Mantém as notificações fixas sincronizadas com cada atualização de previsão
+  useEffect(() => {
+    savedStops.forEach(entry => {
+      const key = savedStopKey(entry);
+      if (pinned[key] && departures[key]) updatePinned(entry, departures[key].arrivals);
+    });
+  }, [departures, pinned, savedStops]);
+
+  const togglePin = async (entry) => {
+    tapFeedback();
+    const key = savedStopKey(entry);
+    if (pinned[key]) {
+      await clearPinned(entry);
+      setPinned(prev => ({ ...prev, [key]: false }));
+    } else if (await updatePinned(entry, departures[key]?.arrivals || [])) {
+      setPinned(prev => ({ ...prev, [key]: true }));
+    }
+  };
+
+  const removeStop = (entry) => {
+    clearPinned(entry);
+    onRemove(entry);
+  };
 
   return (
     <section className="space-y-2.5" aria-labelledby="my-stops-title">
@@ -150,9 +178,21 @@ export default function MyStops({ savedStops, onOpen, onRemove }) {
                 </div>
                 <Arrivals state={departures[key]} />
               </button>
+              {nativePin && (
+                <button
+                  type="button"
+                  onClick={() => togglePin(entry)}
+                  aria-pressed={Boolean(pinned[key])}
+                  className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-2 ${pinned[key] ? 'text-accent' : 'text-faint hover:text-ink'}`}
+                  aria-label={pinned[key] ? 'Desafixar da barra de notificações' : 'Fixar na barra de notificações'}
+                  title={pinned[key] ? 'Desafixar da barra' : 'Fixar na barra de notificações'}
+                >
+                  {pinned[key] ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => onRemove(entry)}
+                onClick={() => removeStop(entry)}
                 className="absolute top-2 right-2 w-8 h-8 rounded-full text-faint hover:text-ink hover:bg-surface-2 flex items-center justify-center"
                 aria-label={`Remover ponto ${entry.stopName} da linha ${entry.line.routeCode}`}
                 title="Remover dos meus pontos"
