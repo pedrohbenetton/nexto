@@ -38,3 +38,6 @@ scripts/route-line.js
 server/data/*.cache
 server/data/stop_coords_cache.json
 server/data/routes_geometry_cache.json
+
+# Local secrets/tokens
+tokens.json
