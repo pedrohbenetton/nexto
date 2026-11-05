@@ -302,3 +302,32 @@ describe('/api/issues', () => {
     assert.deepEqual(body.data, []);
   });
 });
+
+describe('GET /api/trip', () => {
+  const Q = 'fromLat=-23.58&fromLng=-47.52&toLat=-23.53&toLng=-47.48';
+
+  test('400 sem coordenadas ou com coordenadas inválidas', async () => {
+    assert.equal((await api.get('/trip?fromLat=-23.58&fromLng=-47.52')).status, 400);
+    assert.equal((await api.get('/trip?fromLat=abc&fromLng=1&toLat=2&toLng=3')).status, 400);
+    assert.equal((await api.get('/trip?fromLat=95&fromLng=1&toLat=2&toLng=3')).status, 400);
+  });
+
+  test('repassa parâmetros ao serviço e devolve o plano', async t => {
+    const plan = t.mock.method(cittaService, 'planTrip', async () => ({ hasError: false, itineraries: [{ durationMin: 20 }] }));
+    const { status, body } = await json(api.get(`/trip?${Q}&dateTime=123&arriveBy=1&maxWalk=500`));
+    assert.equal(status, 200);
+    assert.equal(body.success, true);
+    assert.equal(body.data.itineraries[0].durationMin, 20);
+    assert.deepEqual(plan.mock.calls[0].arguments[0], {
+      fromLat: -23.58, fromLng: -47.52, toLat: -23.53, toLng: -47.48,
+      dateTime: 123, arriveBy: true, maxWalkDistance: 500
+    });
+  });
+
+  test('502 quando o planejador devolve erro de cálculo', async t => {
+    t.mock.method(cittaService, 'planTrip', async () => ({ hasError: true, errorMessage: 'falhou', itineraries: [] }));
+    const { status, body } = await json(api.get(`/trip?${Q}`));
+    assert.equal(status, 502);
+    assert.equal(body.error, 'falhou');
+  });
+});

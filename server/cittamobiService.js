@@ -3,6 +3,7 @@ const protobuf = require('protobufjs');
 const path = require('path');
 const cache = require('./cache');
 const stopGeocoder = require('./stopGeocoder');
+const { buildPlanRequest, normalizeTripPlan } = require('./tripPlanCore');
 
 const TOKEN = "$2a$10$aGN1MBopPjiM/97AzcG28ugrkNejBLKz8sJ/.vJ3RNDRENgyUX1t6";
 const CORE_BASE = "https://core.cittamobi.com.br";
@@ -140,6 +141,17 @@ async function autocompletePlaces(term, lat, lng) {
   // Cache por 1 hora
   cache.set(cacheKey, places, 60 * 60 * 1000);
   return places;
+}
+
+// 4.2. Planejador de rotas A -> B (com baldeação)
+async function planTrip(params) {
+  await initProto();
+  const response = await httpClient.post('/tripplanner/proto/plan', buildPlanRequest(params), {
+    headers: { 'Content-Type': 'application/json; charset=UTF-8' }
+  });
+  const decoded = protoTypes.TripPlanDataProto.decode(new Uint8Array(response.data));
+  const raw = protoTypes.TripPlanDataProto.toObject(decoded, { longs: Number });
+  return normalizeTripPlan(raw);
 }
 
 // 4.5. Resolver coordenadas geográficas por id/key do local
@@ -448,6 +460,7 @@ module.exports = {
   getLinesByCityId,
   getStopPredictions,
   autocompletePlaces,
+  planTrip,
   resolvePlace,
   getLineDetails,
   getLineTracking

@@ -202,6 +202,32 @@ router.get('/autocomplete', async (req, res) => {
   }
 });
 
+// 5.2. Planejador de rotas A -> B
+router.get('/trip', async (req, res) => {
+  try {
+    const { fromLat, fromLng, toLat, toLng, dateTime, arriveBy, maxWalk } = req.query;
+    const [fLat, fLng, tLat, tLng] = [fromLat, fromLng, toLat, toLng].map(v => (v === undefined || v === '' ? NaN : Number(v)));
+    const valid = [fLat, tLat].every(v => Number.isFinite(v) && Math.abs(v) <= 90)
+      && [fLng, tLng].every(v => Number.isFinite(v) && Math.abs(v) <= 180);
+    if (!valid) {
+      return res.status(400).json({ error: 'fromLat, fromLng, toLat e toLng válidos são obrigatórios' });
+    }
+    const plan = await citta.planTrip({
+      fromLat: fLat, fromLng: fLng, toLat: tLat, toLng: tLng,
+      dateTime: dateTime ? Number(dateTime) : undefined,
+      arriveBy: arriveBy === '1' || arriveBy === 'true',
+      maxWalkDistance: maxWalk ? Number(maxWalk) : undefined
+    });
+    if (plan.hasError) {
+      return res.status(502).json({ success: false, error: plan.errorMessage });
+    }
+    res.json({ success: true, data: plan });
+  } catch (error) {
+    console.error('Erro ao planejar rota:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 5.5. Resolução de Coordenadas Geográficas de Locais/Paradas
 router.get('/places/resolve', async (req, res) => {
   try {

@@ -58,11 +58,12 @@ Content-Type: application/json; charset=utf-8
 * **Resposta:** Dados geográficos e de paradas associadas.
 
 ### 3.4. Planejador de Rotas e Itinerários
-* **Método:** `POST` ou `GET`
-* **URL:** `https://core.cittamobi.com.br/trip_search/?fromLat={s}&fromLng={T}&toLat={c}&toLng={p}&startTime={u}&startTimeItinerary={g}&walkdistance={h}&toLocationName={L}`
-* **Mensagens Protobuf:**
-  * `proto.br.com.cittamobi.core.TripPlanDataRequest`
-  * `proto.br.com.cittamobi.core.TripPlanDataResponse`
+* **Método:** `POST` (JSON) — `https://core.cittamobi.com.br/tripplanner/proto/plan`
+* **Headers:** `username: <token>`, `Content-Type: application/json; charset=UTF-8`
+* **Corpo:** `{"from_lat","from_lng","to_lat","to_lng","dateTime"(ms),"arriveOrDepart"(0=partir,1=chegar),"maxWalkDistance"(m),"mode":["BUS","RAIL","FERRY"]}`
+* **Resposta:** `application/x-protobuf`, decodificada direto como `TripPlanDataProto` (sem wrapper). Cada perna (`LegDataProto`) tem `mode` (WALK/BUS), `routeshortname`, `headsign`, tempos em ms, `geometrypoints` (polyline Google, precisão 5). `fare = -1` significa desconhecida. Erro de cálculo: `haserror=true`.
+* **Atenção:** `trip_search/?fromLat=...` do bundle é só link de compartilhamento para o app (não é API); os nomes de campo `fromLat`/`datetime` etc. (camelCase do .proto) NÃO funcionam no JSON.
+* Implementação: `server/tripPlanCore.js`, `planTrip` em `server/cittamobiService.js`, rota `GET /api/trip`.
 
 ---
 
