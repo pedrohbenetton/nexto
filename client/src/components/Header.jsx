@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiUrl } from '../utils/api';
 import { getCurrentPosition } from '../utils/geolocation';
-import { MapPin, Star, Search, Download, Crosshair, Navigation, WifiOff, ChevronDown, X } from 'lucide-react';
+import { MapPin, Star, Search, Download, Crosshair, Navigation, WifiOff, ChevronDown, X, Route } from 'lucide-react';
 import Logo from './Logo';
 
 export default function Header({ 
@@ -16,7 +16,8 @@ export default function Header({
   installPrompt,
   onInstallPWA,
   onCityDetected,
-  onOpenNearbyStops
+  onOpenNearbyStops,
+  onOpenTripPlanner
 }) {
   const [detectingGps, setDetectingGps] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -92,6 +93,14 @@ export default function Header({
             )}
 
             {/* Atalhos (desktop); no mobile ficam na barra inferior */}
+            <button
+              onClick={onOpenTripPlanner}
+              className="hidden md:flex h-10 px-3.5 rounded-full border border-line bg-surface hover:border-line-strong text-xs font-semibold text-ink items-center gap-1.5 transition-colors"
+            >
+              <Route className="w-4 h-4" />
+              <span>Planejar rota</span>
+            </button>
+
             <button
               onClick={onOpenNearbyStops}
               className="hidden md:flex h-10 px-3.5 rounded-full border border-line bg-surface hover:border-line-strong text-xs font-semibold text-ink items-center gap-1.5 transition-colors"

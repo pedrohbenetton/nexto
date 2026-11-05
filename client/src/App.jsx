@@ -17,6 +17,7 @@ import { parseShareParams } from './utils/shareTripCore';
 import AlightAlert from './components/AlightAlert';
 import LinePlate from './components/LinePlate';
 import BottomNav from './components/BottomNav';
+import TripPlannerModal from './components/TripPlannerModal';
 
 export default function App() {
   // Estado da Cidade Ativa (padrão: Sorocaba - SP)
@@ -80,6 +81,7 @@ export default function App() {
   }, []);
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [isNearbyModalOpen, setIsNearbyModalOpen] = useState(false);
+  const [isTripOpen, setIsTripOpen] = useState(false);
 
   // PWA Install Prompt
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -263,7 +265,7 @@ export default function App() {
     };
   })();
 
-  const bottomNavActive = isNearbyModalOpen ? 'nearby' : isCityModalOpen ? 'city' : showOnlyFavorites ? 'favorites' : 'lines';
+  const bottomNavActive = isTripOpen ? 'trip' : isNearbyModalOpen ? 'nearby' : isCityModalOpen ? 'city' : showOnlyFavorites ? 'favorites' : 'lines';
 
   return (
     <div className="relative min-h-screen bg-canvas text-ink flex flex-col font-sans overflow-x-hidden selection:bg-brand selection:text-on-brand">
@@ -280,6 +282,7 @@ export default function App() {
         installPrompt={installPrompt}
         onInstallPWA={handleInstallPWA}
         onOpenNearbyStops={() => setIsNearbyModalOpen(true)}
+        onOpenTripPlanner={() => setIsTripOpen(true)}
         onCityDetected={(city) => {
           setCurrentCity(city);
           setSearchTerm('');
@@ -413,6 +416,7 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onNearby={() => setIsNearbyModalOpen(true)}
+        onTrip={() => setIsTripOpen(true)}
         onFavorites={() => setActiveFilter(prev => (prev === 'favorites' ? 'all' : 'favorites'))}
         onCity={() => setIsCityModalOpen(true)}
       />
@@ -448,6 +452,13 @@ export default function App() {
 
       {/* Aviso de descida (acompanha o GPS mesmo com o drawer fechado) */}
       {alight && <AlightAlert target={alight} onCancel={() => setAlight(null)} />}
+
+      {/* Planejador de rota A -> B */}
+      <TripPlannerModal
+        isOpen={isTripOpen}
+        onClose={() => setIsTripOpen(false)}
+        cityName={currentCity?.cityName}
+      />
 
       {/* Modal de Paradas Próximas via GPS */}
       <NearbyStopsModal

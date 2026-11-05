@@ -1,11 +1,12 @@
 import React from 'react';
-import { Bus, Navigation, Star, MapPin } from 'lucide-react';
+import { Bus, Navigation, Star, MapPin, Route } from 'lucide-react';
 
 // Navegação inferior (somente mobile)
-export default function BottomNav({ active, favoritesCount, onLines, onNearby, onFavorites, onCity }) {
+export default function BottomNav({ active, favoritesCount, onLines, onNearby, onTrip, onFavorites, onCity }) {
   const items = [
     { id: 'lines', label: 'Linhas', icon: Bus, onClick: onLines },
     { id: 'nearby', label: 'Perto', icon: Navigation, onClick: onNearby },
+    { id: 'trip', label: 'Rota', icon: Route, onClick: onTrip },
     { id: 'favorites', label: 'Favoritos', icon: Star, onClick: onFavorites, badge: favoritesCount },
     { id: 'city', label: 'Cidade', icon: MapPin, onClick: onCity }
   ];
@@ -15,7 +16,7 @@ export default function BottomNav({ active, favoritesCount, onLines, onNearby, o
       aria-label="Navegação principal"
       className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-md border-t border-line pb-safe"
     >
-      <ul className="grid grid-cols-4 h-16">
+      <ul className="grid grid-cols-5 h-16">
         {items.map(({ id, label, icon: Icon, onClick, badge }) => {
           const isActive = active === id;
           return (
