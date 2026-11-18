@@ -4,7 +4,10 @@ const fs = require('fs');
 
 const cache = require('../server/cache');
 const crowding = require('../server/crowdingRegistry');
-const { haversineDistance, findNearbyStops } = require('../server/nearbyStops');
+const nearbyStopsModule = require('../server/nearbyStops');
+const { haversineDistance, findNearbyStops } = nearbyStopsModule;
+const cittaService = require('../server/cittamobiService');
+const gtfsProvider = require('../server/providers/GTFSRealtimeProvider');
 
 describe('MemoryCache', () => {
   test('retorna valor dentro do TTL e null depois de expirar', t => {
@@ -146,5 +149,97 @@ describe('nearbyStops', () => {
     assert.equal(stops[0].walkTimeMinutes, 1);
 
     assert.equal(findNearbyStops(-23.5, -47.4, 2000, 1).length, 1);
+  });
+
+  test('findNearbyStops preserva stopId e lines quando o cache contém entradas enriquecidas', t => {
+    mockStopCache(t, {
+      '35:stop-1': {
+        stopId: 'stop-1',
+        name: 'Av. General Carneiro, 140',
+        address: 'Av. General Carneiro, 140 - Centro, Sorocaba - SP',
+        lat: -23.501,
+        lng: -47.4,
+        lines: [{ routeCode: '80', lineRoutesPath: 'p-80' }]
+      }
+    });
+
+    const stops = findNearbyStops(-23.5, -47.4, 2000, 10);
+    assert.equal(stops.length, 1);
+    assert.equal(stops[0].stopId, 'stop-1');
+    assert.equal(stops[0].name, 'Av. General Carneiro, 140');
+    assert.equal(stops[0].lines[0].routeCode, '80');
+  });
+
+  test('findNearbyStopsWithLines agrega paradas de provedor GTFS (cityId >= 9000)', async t => {
+    cache.clear();
+    t.mock.method(fs, 'writeFileSync', () => {});
+    t.mock.method(gtfsProvider, 'getLines', async () => [
+      { id: 'g1', routeCode: '8000-10', routeMnemonic: 'TERM LAPA', serviceMnemonic: 'PÇA RAMOS', lineRoutesPath: 'gtfs-8000' }
+    ]);
+    t.mock.method(gtfsProvider, 'getLineTracking', async () => ({
+      serviceId: 'srv-gtfs-8000',
+      stops: [
+        { stopId: 'st-lapa', name: 'Terminal Lapa', lat: -23.5188, lng: -46.7022 },
+        { stopId: 'st-longe', name: 'Praça Ramos', lat: -23.6000, lng: -46.6000 }
+      ]
+    }));
+
+    const res = await nearbyStopsModule.findNearbyStopsWithLines({
+      lat: -23.5190,
+      lng: -46.7020,
+      cityId: 9001,
+      radius: 1000,
+      limit: 5
+    });
+
+    assert.equal(res.length, 1);
+    assert.equal(res[0].stopId, 'st-lapa');
+    assert.equal(res[0].lines[0].routeCode, '8000-10');
+    assert.equal(res[0].lines[0].serviceId, 'srv-gtfs-8000');
+  });
+
+  test('findNearbyStopsWithLines descobre paradas via OTP + catálogo Cittamobi e resolve stopId', async t => {
+    cache.clear();
+    t.mock.method(fs, 'writeFileSync', () => {});
+    t.mock.method(cittaService, 'getLinesByCityId', async () => [
+      { id: '1', routeCode: '80', routeMnemonic: 'UFSCAR', serviceMnemonic: 'U F S C A R - Bairro', lineRoutesPath: 'p-80-b' }
+    ]);
+    t.mock.method(cittaService, 'planTripRaw', async () => ({
+      haserror: false,
+      itineraries: [{
+        legs: [{
+          mode: 'BUS',
+          routeshortname: '80',
+          headsign: 'U F S C A R - Bairro',
+          routelongname: 'Ufscar',
+          stopfromname: 'Av. Dr. Armando Pannunzio, 1700 - Jardim Piazza Di Roma, Sorocaba - SP, 18050-000, Brasil',
+          stopfromlat: -23.5282,
+          stopfromlng: -47.4902,
+          intermediatestopsnames: [],
+          intermediatestopslat: [],
+          intermediatestopslng: []
+        }]
+      }]
+    }));
+    t.mock.method(cittaService, 'getLineDetails', async () => ({
+      serviceId: 'srv-80-b',
+      stops: [
+        { index: 0, stopId: 'stop-1700', name: 'Av. Dr. Armando Pannunzio, 1700 - Jardim Piazza Di Roma, Sorocaba - SP' }
+      ]
+    }));
+
+    const res = await nearbyStopsModule.findNearbyStopsWithLines({
+      lat: -23.5279,
+      lng: -47.4914,
+      cityId: 35,
+      radius: 2000,
+      limit: 8
+    });
+
+    assert.equal(res.length, 1);
+    assert.equal(res[0].stopId, 'stop-1700');
+    assert.equal(res[0].lines.length, 1);
+    assert.equal(res[0].lines[0].lineRoutesPath, 'p-80-b');
+    assert.equal(res[0].lines[0].serviceId, 'srv-80-b');
   });
 });

@@ -244,18 +244,30 @@ router.get('/places/resolve', async (req, res) => {
 });
 
 // 5.8. Paradas Próximas por Raio Geográfico (GPS)
-router.get('/stops/nearby', (req, res) => {
+router.get('/stops/nearby', async (req, res) => {
   try {
-    const { lat, lng, radius, limit } = req.query;
+    const { lat, lng, radius, limit, cityId } = req.query;
     if (!lat || !lng) {
       return res.status(400).json({ error: 'lat e lng são obrigatórios' });
     }
     const userLat = parseFloat(lat);
     const userLng = parseFloat(lng);
-    const maxRadius = radius ? parseInt(radius) : 2500;
-    const maxLimit = limit ? parseInt(limit) : 8;
+    if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
+      return res.status(400).json({ error: 'lat e lng válidos são obrigatórios' });
+    }
+    const maxRadius = radius ? parseInt(radius, 10) : 2500;
+    const maxLimit = limit ? parseInt(limit, 10) : 8;
 
-    const stops = nearbyStops.findNearbyStops(userLat, userLng, maxRadius, maxLimit);
+    const stops = cityId !== undefined && cityId !== ''
+      ? await nearbyStops.findNearbyStopsWithLines({
+          lat: userLat,
+          lng: userLng,
+          cityId: parseInt(cityId, 10),
+          radius: maxRadius,
+          limit: maxLimit
+        })
+      : nearbyStops.findNearbyStops(userLat, userLng, maxRadius, maxLimit);
+
     res.json({ success: true, count: stops.length, data: stops });
   } catch (error) {
     console.error('Erro ao buscar paradas próximas:', error.message);

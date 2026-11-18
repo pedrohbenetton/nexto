@@ -464,6 +464,11 @@ export default function App() {
       <NearbyStopsModal
         isOpen={isNearbyModalOpen}
         onClose={() => setIsNearbyModalOpen(false)}
+        cityId={currentCity?.cityId || 35}
+        lines={lines}
+        onSelectLineStop={(line, stopId) => {
+          handleSelectLine(line, stopId);
+        }}
         onSelectStop={(stop) => {
           setSearchTerm(stop.name);
         }}

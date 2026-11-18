@@ -247,6 +247,33 @@ describe('GET /api/stops/nearby', () => {
     assert.deepEqual(fake.mock.calls[0].arguments, [1, 2, 500, 3]);
     assert.equal(body.count, 1);
   });
+
+  test('com cityId resolve paradas enriquecidas com as linhas que atendem cada ponto', async t => {
+    const enriched = [{
+      stopId: 'stop-1700',
+      cityId: 35,
+      name: 'Av. Dr. Armando Pannunzio, 1700',
+      address: 'Av. Dr. Armando Pannunzio, 1700 - Jardim Piazza Di Roma, Sorocaba - SP',
+      lat: -23.5282,
+      lng: -47.4902,
+      distanceMeters: 120,
+      walkTimeMinutes: 2,
+      lines: [{ routeCode: '80', lineRoutesPath: 'p-80', serviceId: 'srv-80', stopId: 'stop-1700' }]
+    }];
+    const fake = t.mock.method(nearbyStops, 'findNearbyStopsWithLines', async () => enriched);
+    const { status, body } = await json(api.get('/stops/nearby?lat=-23.5279&lng=-47.4914&cityId=35&radius=2000&limit=6'));
+    assert.equal(status, 200);
+    assert.deepEqual(fake.mock.calls[0].arguments, [{
+      lat: -23.5279,
+      lng: -47.4914,
+      cityId: 35,
+      radius: 2000,
+      limit: 6
+    }]);
+    assert.equal(body.count, 1);
+    assert.equal(body.data[0].stopId, 'stop-1700');
+    assert.equal(body.data[0].lines[0].routeCode, '80');
+  });
 });
 
 describe('GET /api/lines/paired', () => {

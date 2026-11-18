@@ -144,13 +144,17 @@ async function autocompletePlaces(term, lat, lng) {
 }
 
 // 4.2. Planejador de rotas A -> B (com baldeação)
-async function planTrip(params) {
+async function planTripRaw(params) {
   await initProto();
   const response = await httpClient.post('/tripplanner/proto/plan', buildPlanRequest(params), {
     headers: { 'Content-Type': 'application/json; charset=UTF-8' }
   });
   const decoded = protoTypes.TripPlanDataProto.decode(new Uint8Array(response.data));
-  const raw = protoTypes.TripPlanDataProto.toObject(decoded, { longs: Number });
+  return protoTypes.TripPlanDataProto.toObject(decoded, { longs: Number });
+}
+
+async function planTrip(params) {
+  const raw = await planTripRaw(params);
   return normalizeTripPlan(raw);
 }
 
@@ -460,8 +464,10 @@ module.exports = {
   getLinesByCityId,
   getStopPredictions,
   autocompletePlaces,
+  planTripRaw,
   planTrip,
   resolvePlace,
+  cleanStopAddress,
   getLineDetails,
   getLineTracking
 };
