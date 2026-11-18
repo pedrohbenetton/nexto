@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   putCachedLineDetails,
   buildStopSearchIndex,
-  partitionScheduledDepartures
+  partitionScheduledDepartures,
+  scheduledArrivalsForStop
 } from './offlineCatalogCore.js';
 
 describe('offlineCatalogCore', () => {
@@ -54,5 +55,19 @@ describe('offlineCatalogCore', () => {
     const res = partitionScheduledDepartures(departures, now);
     assert.equal(res.nextDeparture, null);
     assert.deepEqual(res.upcoming, []);
+  });
+
+  test('scheduledArrivalsForStop projeta as próximas saídas de tabela para um ponto salvo offline', () => {
+    const details = {
+      stops: [
+        { stopId: 'st-1', departures: ['08:00', '22:15', '22:45', '23:30'] }
+      ]
+    };
+    const now = new Date(2026, 10, 17, 22, 10, 0); // 22:10
+    const arr = scheduledArrivalsForStop(details, 'st-1', now, 2);
+    assert.equal(arr.length, 2);
+    assert.equal(arr[0].label, '22:15');
+    assert.equal(arr[1].label, '22:45');
+    assert.equal(arr[0].isRealTime, false);
   });
 });

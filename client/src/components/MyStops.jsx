@@ -3,6 +3,8 @@ import { BookmarkX, MapPin, WifiOff, Pin, PinOff } from 'lucide-react';
 import { apiUrl } from '../utils/api';
 import { savedStopKey, upcomingArrivals } from '../utils/savedStops';
 import { putSnapshot, projectSnapshot, pruneSnapshots, loadSnapshots, storeSnapshots } from '../utils/offlineArrivals';
+import { loadLineDetails } from '../utils/offlineCatalog';
+import { scheduledArrivalsForStop } from '../utils/offlineCatalogCore';
 import { formatClock } from '../utils/tripPlanCore';
 import { canPinNotifications, updatePinned, clearPinned } from '../utils/pinnedNotification';
 import { tapFeedback } from '../utils/haptics';
@@ -22,11 +24,17 @@ function useStopDepartures(savedStops) {
     if (savedStops.length === 0) return undefined;
     let cancelled = false;
 
-    const offlineState = (key) => {
+    const offlineState = (entry, key) => {
       const projected = projectSnapshot(snapshots.current[key]);
-      return projected
-        ? { status: 'offline', arrivals: projected.arrivals, at: projected.at }
-        : { status: 'error', arrivals: [] };
+      if (projected && projected.arrivals.length > 0) {
+        return { status: 'offline', arrivals: projected.arrivals, at: projected.at };
+      }
+      const cachedDetails = loadLineDetails(entry?.line?.lineRoutesPath);
+      const scheduled = scheduledArrivalsForStop(cachedDetails, entry?.stopId);
+      if (scheduled.length > 0) {
+        return { status: 'scheduled', arrivals: scheduled };
+      }
+      return { status: 'error', arrivals: [] };
     };
 
     const load = () => {
@@ -45,11 +53,11 @@ function useStopDepartures(savedStops) {
             storeSnapshots(snapshots.current);
             setDepartures(prev => ({ ...prev, [key]: { status: 'ok', arrivals } }));
           } else {
-            setDepartures(prev => ({ ...prev, [key]: offlineState(key) }));
+            setDepartures(prev => ({ ...prev, [key]: offlineState(entry, key) }));
           }
         } catch {
           if (!cancelled) {
-            setDepartures(prev => ({ ...prev, [key]: offlineState(key) }));
+            setDepartures(prev => ({ ...prev, [key]: offlineState(entry, key) }));
           }
         }
       });
@@ -94,6 +102,11 @@ function Arrivals({ state }) {
       {state.status === 'offline' && (
         <p className="mb-0.5 flex items-center justify-end gap-1 text-[10px] font-semibold uppercase tracking-wide text-warn">
           <WifiOff className="w-3 h-3" />offline · {formatClock(state.at)}
+        </p>
+      )}
+      {state.status === 'scheduled' && (
+        <p className="mb-0.5 flex items-center justify-end gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <WifiOff className="w-3 h-3" />tabela salva
         </p>
       )}
       <p className="flex items-center justify-end gap-1.5">

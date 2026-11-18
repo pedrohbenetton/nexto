@@ -69,3 +69,24 @@ export function partitionScheduledDepartures(departures = [], nowDate = new Date
     all
   };
 }
+
+export function scheduledArrivalsForStop(details, stopId, nowDate = new Date(), maxItems = 3) {
+  if (!details || !Array.isArray(details.stops) || !stopId) return [];
+  const stop = details.stops.find(s => s.stopId === stopId);
+  if (!stop || !Array.isArray(stop.departures)) return [];
+
+  const { upcoming } = partitionScheduledDepartures(stop.departures, nowDate);
+  const currentMin = nowDate.getHours() * 60 + nowDate.getMinutes();
+
+  return upcoming.slice(0, maxItems).map(hhmm => {
+    const targetMin = toMinutesOfDay(hhmm);
+    const seconds = Math.max(0, ((targetMin ?? currentMin) - currentMin) * 60);
+    return {
+      vehicleId: null,
+      seconds,
+      label: hhmm,
+      isRealTime: false,
+      isScheduled: true
+    };
+  });
+}
