@@ -19,7 +19,7 @@ function initCaches() {
     if (fs.existsSync(ROUTES_CACHE_FILE)) {
       routesCache = JSON.parse(fs.readFileSync(ROUTES_CACHE_FILE, 'utf-8'));
     }
-  } catch (e) {
+  } catch {
     coordsCache = {};
     routesCache = {};
   }
@@ -27,12 +27,158 @@ function initCaches() {
 initCaches();
 
 function saveRoutesCache() {
+  if (process.env.NODE_TEST_CONTEXT) return;
   try {
     fs.writeFileSync(ROUTES_CACHE_FILE, JSON.stringify(routesCache, null, 2), 'utf-8');
-  } catch (e) {}
+  } catch {}
 }
 
-// 1. Corredores Curados de Alta Precisão (Waypoints Asfálticos)
+function saveCoordsCache() {
+  if (process.env.NODE_TEST_CONTEXT) return;
+  try {
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(coordsCache, null, 2), 'utf-8');
+  } catch {}
+}
+
+// Centros e eixos viários de referência por cidade (Cittamobi & GTFS)
+const CITY_PROFILES = {
+  35: {
+    name: 'Sorocaba',
+    state: 'SP',
+    slugs: ['sorocaba'],
+    center: [-23.505427, -47.452724],
+    fallbackWaypoints: [
+      [-23.505427, -47.452724],
+      [-23.501500, -47.459000],
+      [-23.493889, -47.460833]
+    ]
+  },
+  28: {
+    name: 'São Paulo',
+    state: 'SP',
+    slugs: ['saopaulo'],
+    center: [-23.550520, -46.633308],
+    fallbackWaypoints: [
+      [-23.550520, -46.633308],
+      [-23.561414, -46.655881],
+      [-23.545800, -46.638900]
+    ]
+  },
+  9001: {
+    name: 'São Paulo',
+    state: 'SP',
+    slugs: ['gtfs-sp'],
+    center: [-23.550520, -46.633308],
+    fallbackWaypoints: [
+      [-23.518800, -46.702200],
+      [-23.529800, -46.671100],
+      [-23.545800, -46.638900]
+    ]
+  },
+  8: {
+    name: 'Salvador',
+    state: 'BA',
+    slugs: ['salvador'],
+    center: [-12.977749, -38.501630],
+    fallbackWaypoints: [
+      [-12.977749, -38.501630],
+      [-12.981500, -38.465000],
+      [-13.006575, -38.509064]
+    ]
+  },
+  16: {
+    name: 'Belo Horizonte',
+    state: 'MG',
+    slugs: ['belohorizonte'],
+    center: [-19.919052, -43.938668],
+    fallbackWaypoints: [
+      [-19.919052, -43.938668],
+      [-19.932000, -43.938000],
+      [-19.912000, -43.926000]
+    ]
+  },
+  20: {
+    name: 'Recife',
+    state: 'PE',
+    slugs: ['recife'],
+    center: [-8.063169, -34.871139],
+    fallbackWaypoints: [
+      [-8.063169, -34.871139],
+      [-8.057800, -34.882900],
+      [-8.047600, -34.897000]
+    ]
+  },
+  10: {
+    name: 'Brasília',
+    state: 'DF',
+    slugs: ['brasilia'],
+    center: [-15.793889, -47.882778],
+    fallbackWaypoints: [
+      [-15.793889, -47.882778],
+      [-15.799000, -47.864000],
+      [-15.815000, -47.905000]
+    ]
+  },
+  5: {
+    name: 'Maceió',
+    state: 'AL',
+    slugs: ['maceio'],
+    center: [-9.665992, -35.735000],
+    fallbackWaypoints: [
+      [-9.665992, -35.735000],
+      [-9.649800, -35.708900],
+      [-9.619000, -35.738000]
+    ]
+  },
+  9002: {
+    name: 'Rio de Janeiro',
+    state: 'RJ',
+    slugs: ['gtfs-rj', 'riodejaneiro'],
+    center: [-22.903500, -43.209600],
+    fallbackWaypoints: [
+      [-22.903500, -43.209600],
+      [-22.906800, -43.172900],
+      [-22.951900, -43.185700]
+    ]
+  }
+};
+
+function extractCityHint(linePath = '', cityId) {
+  const lower = String(linePath || '').toLowerCase();
+
+  // 1. Se o próprio lineRoutesPath carrega explicitamente o slug da cidade, respeita o slug
+  for (const [idStr, profile] of Object.entries(CITY_PROFILES)) {
+    if (profile.slugs.some(slug => lower.includes(`-${slug}-`) || lower.startsWith(`${slug}-`))) {
+      return { cityId: Number(idStr), ...profile };
+    }
+  }
+
+  // 2. Caso contrário, usa o cityId informado quando mapeado
+  const numId = cityId === undefined || cityId === null || cityId === '' ? NaN : Number(cityId);
+  if (Number.isFinite(numId) && CITY_PROFILES[numId]) {
+    return { cityId: numId, ...CITY_PROFILES[numId] };
+  }
+
+  // 3. Extrai o nome de qualquer outra cidade do padrão transporte_publico-<Cidade>-<Empresa>-...
+  const slugMatch = String(linePath || '').match(/^transporte_publico-([A-Za-z]+)-/);
+  if (slugMatch) {
+    const humanized = slugMatch[1].replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+    if (humanized.toLowerCase() !== 'sorocaba') {
+      return {
+        cityId: Number.isFinite(numId) ? numId : 0,
+        name: humanized,
+        state: '',
+        slugs: [slugMatch[1].toLowerCase()],
+        center: null,
+        fallbackWaypoints: CITY_PROFILES[28].fallbackWaypoints
+      };
+    }
+  }
+
+  return { cityId: 35, ...CITY_PROFILES[35] };
+}
+
+// 1. Corredores Curados de Alta Precisão de Sorocaba (Waypoints Asfálticos)
 const UFSCAR_BAIRRO_WAYPOINTS = [
   [-23.505427, -47.452724], // TSP (Terminal São Paulo) / Leopoldo Machado
   [-23.501500, -47.459000], // Av. Pres. Juscelino Kubitscheck
@@ -88,7 +234,7 @@ const WANEL_WAYPOINTS = [
   [-23.485000, -47.510000]  // Wanel Ville
 ];
 
-// 2. Dicionário de Marcos e Vias para Mapeamento Dinâmico de Qualquer Linha
+// 2. Dicionário de Marcos e Vias para Mapeamento Dinâmico em Sorocaba
 const SOROCABA_LANDMARKS = [
   { pattern: /terminal s[aã]o paulo|tsp|leopoldo machado/i, coord: [-23.505427, -47.452724] },
   { pattern: /terminal santo ant[oô]nio|tsa/i, coord: [-23.493889, -47.460833] },
@@ -127,67 +273,167 @@ const SOROCABA_LANDMARKS = [
   { pattern: /vila carol/i, coord: [-23.475000, -47.465000] }
 ];
 
-// Identifica a lista ideal de waypoints para uma linha
-function resolveRouteWaypoints(linePath, stops = []) {
-  const lower = linePath.toLowerCase();
+function isWithinCityBounds(coord, center) {
+  if (!Array.isArray(coord) || !Number.isFinite(coord[0]) || !Number.isFinite(coord[1])) return false;
+  if (!center) return true;
+  // ~1.2 graus (~130 km) ao redor do centro metropolitano
+  return Math.hypot(coord[0] - center[0], coord[1] - center[1]) <= 1.2;
+}
 
-  // Linha 80 UFSCar
-  if (lower.includes('ufscar')) {
-    if (lower.includes('centro')) {
-      return UFSCAR_CENTRO_WAYPOINTS;
+// Identifica a lista ideal de waypoints síncronos para uma linha
+function resolveRouteWaypoints(linePath, stops = [], cityId = 35) {
+  const hint = extractCityHint(linePath, cityId);
+  const isSorocaba = hint.name === 'Sorocaba';
+  const lower = String(linePath || '').toLowerCase();
+
+  if (isSorocaba) {
+    if (lower.includes('ufscar')) {
+      return lower.includes('centro') ? UFSCAR_CENTRO_WAYPOINTS : UFSCAR_BAIRRO_WAYPOINTS;
     }
-    return UFSCAR_BAIRRO_WAYPOINTS;
-  }
+    if (lower.includes('caranda') || lower.includes('e180') || lower.includes('itavuvu')) {
+      return CARANDA_WAYPOINTS;
+    }
+    if (lower.includes('iguatemi') || lower.includes('campolim') || lower.includes('comitre')) {
+      return CAMPOLIM_WAYPOINTS;
+    }
+    if (lower.includes('eden') || lower.includes('cajuru') || lower.includes('independencia')) {
+      return EDEN_WAYPOINTS;
+    }
+    if (lower.includes('wanel') || lower.includes('cerrado')) {
+      return WANEL_WAYPOINTS;
+    }
 
-  // Linhas da Zona Norte (Carandá, Itavuvu, E180, etc.)
-  if (lower.includes('caranda') || lower.includes('e180') || lower.includes('itavuvu')) {
-    return CARANDA_WAYPOINTS;
-  }
-
-  // Linhas Campolim / Iguatemi (65, 56, etc.)
-  if (lower.includes('iguatemi') || lower.includes('campolim') || lower.includes('comitre')) {
-    return CAMPOLIM_WAYPOINTS;
-  }
-
-  // Linhas Éden / Zona Industrial / Cajuru
-  if (lower.includes('eden') || lower.includes('cajuru') || lower.includes('independencia')) {
-    return EDEN_WAYPOINTS;
-  }
-
-  // Linhas Wanel Ville / Cerrado
-  if (lower.includes('wanel') || lower.includes('cerrado')) {
-    return WANEL_WAYPOINTS;
-  }
-
-  // Mapeamento dinâmico baseado nos endereços das paradas da própria linha
-  if (stops && stops.length > 0) {
-    const matched = [];
-    const seen = new Set();
-    stops.forEach(s => {
-      const name = (s.name || s.fullName || '').toLowerCase();
-      for (const lm of SOROCABA_LANDMARKS) {
-        if (lm.pattern.test(name)) {
-          const key = `${lm.coord[0].toFixed(3)}_${lm.coord[1].toFixed(3)}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            matched.push(lm.coord);
+    if (stops && stops.length > 0) {
+      const matched = [];
+      const seen = new Set();
+      stops.forEach(s => {
+        const name = (s.name || s.fullName || '').toLowerCase();
+        for (const lm of SOROCABA_LANDMARKS) {
+          if (lm.pattern.test(name)) {
+            const key = `${lm.coord[0].toFixed(3)}_${lm.coord[1].toFixed(3)}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              matched.push(lm.coord);
+            }
+            break;
           }
-          break;
+        }
+      });
+
+      if (matched.length >= 2) {
+        return matched;
+      }
+    }
+
+    return CITY_PROFILES[35].fallbackWaypoints;
+  }
+
+  // Outras cidades: aproveita coordenadas embutidas ou em cache local, sem jamais usar marcos de Sorocaba
+  if (stops && stops.length > 0) {
+    const cachedMatched = [];
+    const seen = new Set();
+    for (const s of stops) {
+      let coord = null;
+      if (Number.isFinite(s.lat) && Number.isFinite(s.lng)) {
+        coord = [s.lat, s.lng];
+      } else {
+        const cacheEntry =
+          (s.stopId && coordsCache[`${hint.cityId}:${s.stopId}`]) ||
+          (s.name && coordsCache[`${hint.cityId}:${s.name}`]);
+        if (cacheEntry && Number.isFinite(cacheEntry.lat) && Number.isFinite(cacheEntry.lng)) {
+          coord = [cacheEntry.lat, cacheEntry.lng];
         }
       }
-    });
-
-    if (matched.length >= 2) {
-      return matched;
+      if (coord && isWithinCityBounds(coord, hint.center)) {
+        const key = `${coord[0].toFixed(3)}_${coord[1].toFixed(3)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          cachedMatched.push(coord);
+        }
+      }
+    }
+    if (cachedMatched.length >= 2) {
+      return cachedMatched;
     }
   }
 
-  // Padrão Sorocaba: Terminal São Paulo -> Região Noroeste
-  return [
-    [-23.505427, -47.452724],
-    [-23.501500, -47.459000],
-    [-23.493889, -47.460833]
-  ];
+  return hint.fallbackWaypoints;
+}
+
+// Geocodifica até 4 paradas-âncora (origem, terços intermediários e destino) quando resolveStopCoord é fornecido
+async function resolveDynamicAnchorWaypoints(linePath, stops = [], cityId = 35, resolveStopCoord = null) {
+  const staticWaypoints = resolveRouteWaypoints(linePath, stops, cityId);
+  const hint = extractCityHint(linePath, cityId);
+
+  // Se Sorocaba já bateu corredor curado ou marcos suficientes, usa direto sem latência extra
+  if (hint.name === 'Sorocaba' && staticWaypoints !== CITY_PROFILES[35].fallbackWaypoints) {
+    return staticWaypoints;
+  }
+  if (hint.name !== 'Sorocaba' && staticWaypoints !== hint.fallbackWaypoints) {
+    return staticWaypoints;
+  }
+  if (typeof resolveStopCoord !== 'function' || !Array.isArray(stops) || stops.length < 2) {
+    return staticWaypoints;
+  }
+
+  const lastIdx = stops.length - 1;
+  const anchorIndices = Array.from(new Set([
+    0,
+    Math.floor(lastIdx / 3),
+    Math.floor((2 * lastIdx) / 3),
+    lastIdx
+  ]));
+
+  let cacheDirty = false;
+  const resolved = await Promise.all(anchorIndices.map(async (idx) => {
+    const stop = stops[idx];
+    if (!stop) return null;
+    if (Number.isFinite(stop.lat) && Number.isFinite(stop.lng)) {
+      return [stop.lat, stop.lng];
+    }
+
+    const cacheKey = `${hint.cityId}:${stop.stopId || stop.name}`;
+    const existing = coordsCache[cacheKey];
+    if (existing && Number.isFinite(existing.lat) && Number.isFinite(existing.lng)) {
+      return [existing.lat, existing.lng];
+    }
+
+    const rawName = (stop.name || stop.fullName || '').trim();
+    if (!rawName || /^terminal \/ esta|^parada de embarque/i.test(rawName)) return null;
+
+    const hasCityInName = hint.name && rawName.toLowerCase().includes(hint.name.toLowerCase());
+    const suffix = hint.name ? (hint.state ? `${hint.name} - ${hint.state}` : hint.name) : '';
+    const query = hasCityInName || !suffix ? rawName : `${rawName}, ${suffix}`;
+
+    const coord = await resolveStopCoord(query);
+    if (coord && isWithinCityBounds(coord, hint.center)) {
+      coordsCache[cacheKey] = {
+        stopId: stop.stopId || null,
+        name: rawName,
+        lat: coord[0],
+        lng: coord[1],
+        updatedAt: Date.now()
+      };
+      cacheDirty = true;
+      return coord;
+    }
+    return null;
+  }));
+
+  if (cacheDirty) saveCoordsCache();
+
+  const deduped = [];
+  const seen = new Set();
+  for (const coord of resolved) {
+    if (!coord) continue;
+    const key = `${coord[0].toFixed(3)}_${coord[1].toFixed(3)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(coord);
+    }
+  }
+
+  return deduped.length >= 2 ? deduped : staticWaypoints;
 }
 
 // Remove loops, retornos e pontas-mortas (auto-reversões de 180° causadas por waypoints no sentido oposto)
@@ -225,13 +471,13 @@ function removeSpikesAndLoops(polyline) {
 }
 
 // 3. Gerar Rota Contínua Asfáltica (OSRM Multi-Waypoint)
-async function getRoadRouteGeometry(linePath, cityId = 35, stops = []) {
-  const cacheKey = `v5:${cityId}:${linePath}`;
+async function getRoadRouteGeometry(linePath, cityId = 35, stops = [], options = {}) {
+  const cacheKey = `v6:${cityId}:${linePath}`;
   if (routesCache[cacheKey]) {
     return routesCache[cacheKey];
   }
 
-  const waypoints = resolveRouteWaypoints(linePath, stops);
+  const waypoints = await resolveDynamicAnchorWaypoints(linePath, stops, cityId, options.resolveStopCoord);
 
   try {
     const coordsStr = waypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
@@ -282,7 +528,7 @@ function findClosestPolylinePoint(targetLat, targetLng, polyline, minIdx = 0, ma
   let minD = Infinity;
   for (let i = minIdx; i <= maxIdx; i++) {
     const pt = polyline[i];
-    const d = (pt[0] - targetLat)**2 + (pt[1] - targetLng)**2;
+    const d = (pt[0] - targetLat) ** 2 + (pt[1] - targetLng) ** 2;
     if (d < minD) {
       minD = d;
       closest = pt;
@@ -292,14 +538,13 @@ function findClosestPolylinePoint(targetLat, targetLng, polyline, minIdx = 0, ma
 }
 
 // 5. Mapeamento Topológico de Paradas ao Longo do Traçado Asfáltico (Monótono e Sequencial)
-async function mapStopsAlongRoadRoute(stops, linePath, cityId = 35) {
-  const polyline = await getRoadRouteGeometry(linePath, cityId, stops);
+async function mapStopsAlongRoadRoute(stops, linePath, cityId = 35, options = {}) {
+  const polyline = await getRoadRouteGeometry(linePath, cityId, stops, options);
   const totalStops = stops.length;
 
   if (totalStops === 0) return { stops: [], polyline };
 
   // Distribuição proporcional rigorosamente monótona ao longo do traçado asfáltico
-  // Garante que cada parada sucessiva avança sobre a via sem retrocessos ou laços residenciais
   const mappedStops = stops.map((stop, i) => {
     const idx = typeof stop.index === 'number' ? stop.index : i;
     const ratio = totalStops > 1 ? idx / (totalStops - 1) : 0.5;
@@ -323,6 +568,10 @@ async function mapStopsAlongRoadRoute(stops, linePath, cityId = 35) {
 }
 
 module.exports = {
+  extractCityHint,
+  resolveRouteWaypoints,
+  removeSpikesAndLoops,
+  findClosestPolylinePoint,
   getRoadRouteGeometry,
   mapStopsAlongRoadRoute
 };

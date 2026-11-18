@@ -43,6 +43,13 @@ describe('ProviderRegistry', () => {
     assert.equal(registry.getProviderForLine(undefined), cittaProvider);
   });
 
+  test('getProviderForService usa GTFS apenas para serviceIds com prefixo "gtfs-"', () => {
+    assert.equal(registry.getProviderForService('gtfs-srv-gtfs-sp-8000-10'), gtfsProvider);
+    assert.equal(registry.getProviderForService('64796768-e2b3-4bd1-af0f-e2e6a365468b'), cittaProvider);
+    assert.equal(registry.getProviderForService(10), cittaProvider);
+    assert.equal(registry.getProviderForService(undefined), cittaProvider);
+  });
+
   test('searchCitiesAcrossAll concatena GTFS antes de Cittamobi', async t => {
     t.mock.method(cittaProvider, 'searchCities', async () => [{ cityId: 35, cityName: 'Sorocaba' }]);
     t.mock.method(gtfsProvider, 'searchCities', async () => [{ cityId: 9001, cityName: 'São Paulo (GTFS Aberto)' }]);

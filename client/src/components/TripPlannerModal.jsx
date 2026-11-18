@@ -30,7 +30,7 @@ const SLOT_ICONS = {
 };
 
 // Planejador de rota de A até B (com baldeação, atalhos Casa/Trabalho e abertura ao vivo da linha), via /api/trip
-export default function TripPlannerModal({ isOpen, onClose, cityName, lines = [], onOpenLineStop }) {
+export default function TripPlannerModal({ isOpen, onClose, cityName, cityCoords, lines = [], onOpenLineStop }) {
   useEscapeKey(onClose, isOpen);
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
@@ -152,6 +152,7 @@ export default function TripPlannerModal({ isOpen, onClose, cityName, lines = []
             onActivate={() => setActiveField('from')}
             placeholder="Endereço ou local de partida"
             cityName={cityName}
+            cityCoords={cityCoords}
           />
           <div className="flex justify-center">
             <button
@@ -170,6 +171,7 @@ export default function TripPlannerModal({ isOpen, onClose, cityName, lines = []
             onActivate={() => setActiveField('to')}
             placeholder="Para onde você vai?"
             cityName={cityName}
+            cityCoords={cityCoords}
           />
 
           {/* Atalhos rápidos: Casa e Trabalho */}

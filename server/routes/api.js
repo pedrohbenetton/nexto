@@ -168,7 +168,8 @@ router.get('/predictions', async (req, res) => {
     if (!serviceId || !stopId) {
       return res.status(400).json({ error: 'serviceId e stopId são obrigatórios' });
     }
-    const predictions = await citta.getStopPredictions(serviceId, stopId);
+    const provider = providerRegistry.getProviderForService(serviceId);
+    const predictions = await provider.getStopPredictions(serviceId, stopId);
     try {
       predictionHistory.record(serviceId, stopId, predictions.vehicles);
     } catch (e) {

@@ -4,8 +4,22 @@ import {
   sanitizeSavedPlaces,
   setSavedPlace,
   clearSavedPlace,
-  canSavePlaceCandidate
+  canSavePlaceCandidate,
+  loadSavedPlaces,
+  storeSavedPlaces
 } from './savedPlacesCore.js';
+
+function createMemoryStorage({ throwOnSet = false } = {}) {
+  const map = new Map();
+  return {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => {
+      if (throwOnSet) throw new Error('QuotaExceededError');
+      map.set(k, String(v));
+    },
+    clear: () => map.clear()
+  };
+}
 
 describe('savedPlacesCore', () => {
   test('sanitizeSavedPlaces filtra valores inválidos e devolve slots nulos por padrão', () => {
@@ -37,5 +51,18 @@ describe('savedPlacesCore', () => {
     assert.equal(canSavePlaceCandidate({ name: 'Minha localização', lat: -23.5, lng: -47.4 }), false);
     assert.equal(canSavePlaceCandidate({ name: 'UFSCar Sorocaba', lat: -23.58, lng: -47.52 }), true);
     assert.equal(canSavePlaceCandidate(null), false);
+  });
+
+  test('loadSavedPlaces e storeSavedPlaces persistem no localStorage e toleram JSON corrompido ou quota cheia', () => {
+    globalThis.localStorage = createMemoryStorage();
+    const places = setSavedPlace(null, 'work', { name: 'Av. Paulista, 1000', lat: -23.56, lng: -46.65 });
+    storeSavedPlaces(places);
+    assert.deepEqual(loadSavedPlaces(), places);
+
+    globalThis.localStorage.setItem('nexto_saved_places', '{corrompido');
+    assert.deepEqual(loadSavedPlaces(), { home: null, work: null });
+
+    globalThis.localStorage = createMemoryStorage({ throwOnSet: true });
+    assert.doesNotThrow(() => storeSavedPlaces(places));
   });
 });

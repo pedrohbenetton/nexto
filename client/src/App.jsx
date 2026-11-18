@@ -13,6 +13,7 @@ import { LineListSkeleton } from './components/Skeleton';
 import { LINE_FILTERS, lineId, filterLines, countByFilter } from './utils/lineFilters';
 import { saveCityLines, loadCityLines, loadAllLineDetails } from './utils/offlineCatalog';
 import { buildStopSearchIndex } from './utils/offlineCatalogCore';
+import { DEFAULT_CITY, normalizeSavedCity, getCityCoords, cleanCitySearchName } from './utils/citiesCore';
 import { AlertCircle, History, SearchX, Star, Route, MapPinOff, Bookmark } from 'lucide-react';
 import MyStops from './components/MyStops';
 import { toggleSavedStop } from './utils/savedStops';
@@ -27,9 +28,9 @@ export default function App() {
   const [currentCity, setCurrentCity] = useState(() => {
     try {
       const saved = localStorage.getItem('citta_selected_city');
-      return saved ? JSON.parse(saved) : { cityId: 35, cityName: 'Sorocaba', stateInitials: 'SP' };
+      return saved ? normalizeSavedCity(JSON.parse(saved)) : DEFAULT_CITY;
     } catch {
-      return { cityId: 35, cityName: 'Sorocaba', stateInitials: 'SP' };
+      return DEFAULT_CITY;
     }
   });
 
@@ -499,7 +500,8 @@ export default function App() {
       <TripPlannerModal
         isOpen={isTripOpen}
         onClose={() => setIsTripOpen(false)}
-        cityName={currentCity?.cityName}
+        cityName={cleanCitySearchName(currentCity?.cityName)}
+        cityCoords={getCityCoords(currentCity)}
         lines={lines}
         onOpenLineStop={(line, boardingStopName) => {
           handleSelectLine(line, null, boardingStopName);

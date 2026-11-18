@@ -75,6 +75,18 @@ async function getLinesByCityId(cityId) {
   return lines;
 }
 
+// Executa uma requisição repetindo uma única vez em caso de falha transitória de rede/timeout (sem HTTP status)
+async function fetchWithRetry(requestFn) {
+  try {
+    return await requestFn();
+  } catch (err) {
+    if (err && !err.response) {
+      return requestFn();
+    }
+    throw err;
+  }
+}
+
 // 3. Previsão em tempo real de uma parada e linha
 async function getStopPredictions(serviceId, stopId) {
   await initProto();
@@ -83,7 +95,7 @@ async function getStopPredictions(serviceId, stopId) {
   if (cached) return cached;
 
   const url = `/linesroutes/service/predictions?serviceId=${encodeURIComponent(serviceId)}&stopId=${encodeURIComponent(stopId)}`;
-  const response = await httpClient.get(url);
+  const response = await fetchWithRetry(() => httpClient.get(url, { timeout: 6500 }));
 
   const decoded = protoTypes.ServicePredictionsProto.decode(new Uint8Array(response.data));
   const result = protoTypes.ServicePredictionsProto.toObject(decoded, { defaults: true });
@@ -232,22 +244,9 @@ function cleanStopAddress(rawAddress, linePath, index, totalStops) {
   return addr.trim();
 }
 
-// 5. Obter detalhes da linha (paradas, itinerário, serviceId) a partir do lineRoutesPath
-async function getLineDetails(lineRoutesPath) {
-  const cacheKey = `line-details:v2:${lineRoutesPath}`;
-  const cached = cache.get(cacheKey);
-  if (cached) return cached;
-
-  const url = `${CONTENT_BASE}/lines/${lineRoutesPath}.html`;
-  const response = await axios.get(url, {
-    responseType: 'arraybuffer',
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    },
-    timeout: 10000
-  });
-
-  const html = Buffer.from(response.data).toString('utf-8');
+// Extração pura de paradas, serviceId, agencyId e horários a partir do HTML da linha
+function parseLineDetailsHtml(rawHtml, lineRoutesPath) {
+  const html = typeof rawHtml === 'string' ? rawHtml : '';
 
   // Extrair serviceId e agencyId
   const serviceIdMatch = html.match(/id=["']serviceId["'][^>]*value=["']([^"']+)["']/i);
@@ -255,13 +254,15 @@ async function getLineDetails(lineRoutesPath) {
   const serviceId = serviceIdMatch ? serviceIdMatch[1] : null;
   const agencyId = agencyIdMatch ? agencyIdMatch[1] : null;
 
-  // Extrair horários programados do script JSON
+  // Extrair horários programados do script JSON (prioriza id="line-departures-v1", com fallback legado)
   let schedule = {};
-  const schedMatch = html.match(/<script[^>]*>\s*(\{"0":\[.*?\]\})\s*<\/script>/s);
+  const schedMatch =
+    html.match(/<script[^>]*id=["']line-departures-v1["'][^>]*>\s*(\{[\s\S]*?\})\s*<\/script>/i) ||
+    html.match(/<script[^>]*>\s*(\{"\d+":\[[\s\S]*?\]\})\s*<\/script>/);
   if (schedMatch) {
     try {
       schedule = JSON.parse(schedMatch[1]);
-    } catch (e) {
+    } catch {
       // Ignorar falha no parse do cronograma
     }
   }
@@ -309,7 +310,7 @@ async function getLineDetails(lineRoutesPath) {
     };
   });
 
-  const result = {
+  return {
     lineRoutesPath,
     serviceId,
     agencyId,
@@ -317,10 +318,51 @@ async function getLineDetails(lineRoutesPath) {
     stopsCount: stops.length,
     stops
   };
+}
+
+// 5. Obter detalhes da linha (paradas, itinerário, serviceId) a partir do lineRoutesPath
+async function getLineDetails(lineRoutesPath) {
+  const cacheKey = `line-details:v2:${lineRoutesPath}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const url = `${CONTENT_BASE}/lines/${lineRoutesPath}.html`;
+  const response = await axios.get(url, {
+    responseType: 'arraybuffer',
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    },
+    timeout: 10000
+  });
+
+  const html = Buffer.from(response.data).toString('utf-8');
+  const result = parseLineDetailsHtml(html, lineRoutesPath);
 
   // Cache por 6 horas
   cache.set(cacheKey, result, 6 * 60 * 60 * 1000);
   return result;
+}
+
+// Resolve coordenada geográfica de um endereço de parada via autocomplete + resolvePlace
+async function resolveStopCoordByQuery(query) {
+  if (!query || typeof query !== 'string') return null;
+  try {
+    const places = await autocompletePlaces(query);
+    const first = places && places[0];
+    if (!first) return null;
+    if (Number.isFinite(first.lat) && Number.isFinite(first.lng) && !(first.lat === 0 && first.lng === 0)) {
+      return [first.lat, first.lng];
+    }
+    if (first.id) {
+      const resolved = await resolvePlace(first.nome || query, first.id);
+      if (resolved && Number.isFinite(resolved.lat) && Number.isFinite(resolved.lng) && !(resolved.lat === 0 && resolved.lng === 0)) {
+        return [resolved.lat, resolved.lng];
+      }
+    }
+  } catch {
+    // Falha individual de geocodificação não deve interromper o rastreamento
+  }
+  return null;
 }
 
 // 6. Rastreamento e Telemetria em Tempo Real de todos os ônibus e paradas da linha
@@ -330,7 +372,12 @@ async function getLineTracking(lineRoutesPath, serviceId, cityId = 35) {
   const stops = details.stops || [];
 
   // Resolver coordenadas rodoviárias contínuas (OSRM) para traçado e paradas sem zig-zags
-  const { stops: geoStops, polyline } = await stopGeocoder.mapStopsAlongRoadRoute(stops, lineRoutesPath, cityId);
+  const { stops: geoStops, polyline } = await stopGeocoder.mapStopsAlongRoadRoute(
+    stops,
+    lineRoutesPath,
+    cityId,
+    { resolveStopCoord: resolveStopCoordByQuery }
+  );
 
   // Amostrar previsões em tempo real ao longo do corredor
   const vehiclesMap = new Map();
@@ -462,12 +509,14 @@ async function getLineTracking(lineRoutesPath, serviceId, cityId = 35) {
 module.exports = {
   searchCities,
   getLinesByCityId,
+  fetchWithRetry,
   getStopPredictions,
   autocompletePlaces,
   planTripRaw,
   planTrip,
   resolvePlace,
   cleanStopAddress,
+  parseLineDetailsHtml,
   getLineDetails,
   getLineTracking
 };

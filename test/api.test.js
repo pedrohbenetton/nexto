@@ -181,6 +181,15 @@ describe('GET /api/reliability', () => {
     assert.equal(body.data.level, 'unknown');
   });
 
+  test('repassa hour numérico para predictionHistory.getReliability', async t => {
+    const history = require('../server/predictionHistory');
+    const spy = t.mock.method(history, 'getReliability', () => ({ level: 'high', samples: 12 }));
+    const { status, body } = await json(api.get('/reliability?serviceId=s1&stopId=p1&hour=8'));
+    assert.equal(status, 200);
+    assert.equal(body.data.level, 'high');
+    assert.deepEqual(spy.mock.calls[0].arguments, ['s1', 'p1', 8]);
+  });
+
   test('/predictions alimenta o histórico sem alterar a resposta', async t => {
     const history = require('../server/predictionHistory');
     const rec = t.mock.method(history, 'record');
@@ -192,6 +201,8 @@ describe('GET /api/reliability', () => {
 });
 
 describe('GET /api/predictions', () => {
+  beforeEach(t => { t.mock.method(console, 'error', () => {}); });
+
   test('400 sem serviceId ou stopId', async () => {
     assert.equal((await api.get('/predictions?serviceId=1')).status, 400);
     assert.equal((await api.get('/predictions?stopId=1')).status, 400);
@@ -203,6 +214,35 @@ describe('GET /api/predictions', () => {
     assert.equal(status, 200);
     assert.deepEqual(body, { success: true, data: { vehicles: [] } });
     assert.deepEqual(fake.mock.calls[0].arguments, ['10', '20']);
+  });
+
+  test('roteia serviceId gtfs- para GTFSRealtimeProvider sem acionar Cittamobi', async t => {
+    const cittaSpy = t.mock.method(cittaService, 'getStopPredictions', async () => {
+      throw new Error('não deveria chamar Cittamobi para GTFS');
+    });
+    const { status, body } = await json(api.get('/predictions?serviceId=gtfs-srv-sp-8000&stopId=stop_1'));
+    assert.equal(status, 200);
+    assert.equal(body.success, true);
+    assert.equal(body.data.serviceId, 'gtfs-srv-sp-8000');
+    assert.equal(body.data.stopId, 'stop_1');
+    assert.ok(Array.isArray(body.data.vehicles));
+    assert.equal(cittaSpy.mock.callCount(), 0);
+  });
+
+  test('continua respondendo 200 mesmo se predictionHistory.record lançar erro', async t => {
+    const history = require('../server/predictionHistory');
+    t.mock.method(history, 'record', () => { throw new Error('disco cheio'); });
+    t.mock.method(cittaService, 'getStopPredictions', async () => ({ vehicles: [{ vehicleId: 'v1' }] }));
+    const { status, body } = await json(api.get('/predictions?serviceId=10&stopId=20'));
+    assert.equal(status, 200);
+    assert.equal(body.data.vehicles[0].vehicleId, 'v1');
+  });
+
+  test('500 quando o provedor de previsões falha', async t => {
+    t.mock.method(cittaService, 'getStopPredictions', async () => { throw new Error('upstream indisponível'); });
+    const { status, body } = await json(api.get('/predictions?serviceId=10&stopId=20'));
+    assert.equal(status, 500);
+    assert.equal(body.error, 'upstream indisponível');
   });
 });
 
@@ -231,8 +271,10 @@ describe('GET /api/places/resolve', () => {
 });
 
 describe('GET /api/stops/nearby', () => {
-  test('400 sem lat/lng', async () => {
+  test('400 sem lat/lng ou com lat/lng não numéricos', async () => {
     assert.equal((await api.get('/stops/nearby?lat=1')).status, 400);
+    assert.equal((await api.get('/stops/nearby?lat=abc&lng=-47.4')).status, 400);
+    assert.equal((await api.get('/stops/nearby?lat=-23.5&lng=xyz')).status, 400);
   });
 
   test('usa raio 2500 m e limite 8 por padrão', async t => {
@@ -309,13 +351,19 @@ describe('/api/crowding', () => {
     assert.equal(body.data.level, 'unknown');
   });
 
-  test('consulta em lote via GET /crowding?ids= retorna mapa por veículo e 400 sem ids', async () => {
+  test('consulta em lote via GET /crowding?ids= retorna mapa por veículo, limita a 50 IDs e retorna 400 sem ids', async () => {
     assert.equal((await api.get('/crowding')).status, 400);
+    assert.equal((await api.get('/crowding?ids=%20,%20')).status, 400);
     await api.post('/crowding/report', { vehicleId: 'b-1', level: 'low' });
     const { status, body } = await json(api.get('/crowding?ids=b-1,b-inexistente'));
     assert.equal(status, 200);
     assert.equal(body.data['b-1'].level, 'low');
     assert.equal(body.data['b-inexistente'].level, 'unknown');
+
+    const sixtyIds = Array.from({ length: 60 }, (_, i) => `veh-${i}`).join(',');
+    const capped = await json(api.get(`/crowding?ids=${sixtyIds}`));
+    assert.equal(capped.status, 200);
+    assert.equal(Object.keys(capped.body.data).length, 50);
   });
 });
 

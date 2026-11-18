@@ -26,6 +26,7 @@ function readStopCacheFile() {
 }
 
 function persistEnrichedStops(cityId, stops) {
+  if (process.env.NODE_TEST_CONTEXT) return;
   if (!Array.isArray(stops) || stops.length === 0) return;
   try {
     const dir = path.dirname(STOP_CACHE_FILE);

@@ -202,3 +202,62 @@ export function findInitialStop(stops = [], { stopId, stopName } = {}) {
 
   return stops[0];
 }
+
+function foldAccents(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+// Monta a URL de /api/autocomplete evitando duplicar o município e aplicando viés geográfico (lat/lng)
+export function buildAutocompletePath(rawTerm, { cityName, lat, lng } = {}) {
+  const term = String(rawTerm || '').trim();
+  const cleanCity = String(cityName || '').replace(/\s*\([^)]*\)\s*/g, '').trim();
+  const foldedTerm = foldAccents(term);
+  const foldedCity = foldAccents(cleanCity);
+
+  const query = cleanCity && !foldedTerm.includes(foldedCity)
+    ? `${term}, ${cleanCity}`
+    : term;
+
+  let url = `/api/autocomplete?term=${encodeURIComponent(query)}`;
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    url += `&lat=${lat}&lng=${lng}`;
+  }
+  return url;
+}
+
+// Ordena e deduplica sugestões do autocomplete priorizando endereços situados no município ativo
+export function rankPlaceSuggestions(places = [], cityName = '', limit = 6) {
+  if (!Array.isArray(places) || places.length === 0) return [];
+  const cleanCity = foldAccents(String(cityName || '').replace(/\s*\([^)]*\)\s*/g, ''));
+
+  const annotated = places
+    .filter(p => p && typeof p.nome === 'string' && p.nome.trim())
+    .map((place, index) => {
+      const segments = place.nome.split(',').map(seg => foldAccents(seg)).filter(Boolean);
+      const inActiveCity = cleanCity
+        ? segments.slice(1).some(seg => seg === cleanCity || seg.startsWith(`${cleanCity} -`))
+        : true;
+      return { place, index, inActiveCity };
+    });
+
+  const hasAnyInCity = cleanCity && annotated.some(item => item.inActiveCity);
+  const filtered = hasAnyInCity
+    ? annotated.filter(item => item.inActiveCity)
+    : annotated;
+
+  filtered.sort((a, b) => {
+    if (a.inActiveCity !== b.inActiveCity) return a.inActiveCity ? -1 : 1;
+    return a.index - b.index;
+  });
+
+  const seen = new Set();
+  const unique = [];
+  for (const { place } of filtered) {
+    const key = foldAccents(shortPlaceName(place.nome));
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(place);
+    if (unique.length >= limit) break;
+  }
+  return unique;
+}

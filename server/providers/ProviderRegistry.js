@@ -25,6 +25,13 @@ class ProviderRegistry {
     return this.providers.cittamobi;
   }
 
+  getProviderForService(serviceId) {
+    if (serviceId && String(serviceId).startsWith('gtfs-')) {
+      return this.providers.gtfs;
+    }
+    return this.providers.cittamobi;
+  }
+
   async searchCitiesAcrossAll(query) {
     const [cittaCities, gtfsCities] = await Promise.all([
       this.providers.cittamobi.searchCities(query).catch(() => []),

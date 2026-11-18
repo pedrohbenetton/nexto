@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Crosshair, Loader2 } from 'lucide-react';
 import { apiUrl } from '../utils/api';
 import { getCurrentPosition } from '../utils/geolocation';
-import { shortPlaceName, needsResolve } from '../utils/tripPlanCore';
+import { shortPlaceName, needsResolve, buildAutocompletePath, rankPlaceSuggestions } from '../utils/tripPlanCore';
 
 // Campo de endereço com autocomplete. Entrega { name, lat, lng } já resolvido.
-export default function PlaceInput({ label, value, onChange, onActivate, placeholder, cityName }) {
+export default function PlaceInput({ label, value, onChange, onActivate, placeholder, cityName, cityCoords }) {
   const [draft, setDraft] = useState(value?.name || '');
   const [editing, setEditing] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
@@ -35,18 +35,15 @@ export default function PlaceInput({ label, value, onChange, onActivate, placeho
     timer.current = setTimeout(async () => {
       const id = ++requestId.current;
       try {
-        const query = cityName ? `${term.trim()}, ${cityName}` : term.trim();
-        const res = await fetch(apiUrl(`/api/autocomplete?term=${encodeURIComponent(query)}`));
+        const path = buildAutocompletePath(term, {
+          cityName,
+          lat: cityCoords?.lat,
+          lng: cityCoords?.lng
+        });
+        const res = await fetch(apiUrl(path));
         const json = await res.json();
         if (id === requestId.current && json.success) {
-          const seen = new Set();
-          const unique = json.data.filter(p => {
-            const key = shortPlaceName(p.nome).toLowerCase();
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          });
-          setSuggestions(unique.slice(0, 6));
+          setSuggestions(rankPlaceSuggestions(json.data, cityName, 6));
           setOpen(true);
         }
       } catch {

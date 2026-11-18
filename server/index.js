@@ -25,6 +25,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '16kb' }));
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Payload excede o limite de 16kb.' });
+  }
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'JSON inválido no corpo da requisição.' });
+  }
+  next(err);
+});
 
 // Log simplificado de requisições (suprimido durante suíte de testes)
 if (!process.env.NODE_TEST_CONTEXT) {

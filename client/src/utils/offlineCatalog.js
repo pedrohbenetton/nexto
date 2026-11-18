@@ -1,4 +1,4 @@
-import { putCachedLineDetails } from './offlineCatalogCore';
+import { putCachedLineDetails } from './offlineCatalogCore.js';
 
 const LINES_PREFIX = 'nexto_lines_city_';
 const DETAILS_KEY = 'nexto_line_details_v1';

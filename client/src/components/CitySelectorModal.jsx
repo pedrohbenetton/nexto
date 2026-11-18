@@ -1,16 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiUrl } from '../utils/api';
+import { POPULAR_CITIES } from '../utils/citiesCore';
 import { useEscapeKey } from '../utils/useEscapeKey';
 import { Search, X, Loader2, Globe } from 'lucide-react';
-
-const POPULAR_CITIES = [
-  { cityId: 35, cityName: 'Sorocaba', stateInitials: 'SP' },
-  { cityId: 1, cityName: 'São Paulo', stateInitials: 'SP' },
-  { cityId: 10, cityName: 'Salvador', stateInitials: 'BA' },
-  { cityId: 14, cityName: 'Belo Horizonte', stateInitials: 'MG' },
-  { cityId: 18, cityName: 'Recife', stateInitials: 'PE' },
-  { cityId: 22, cityName: 'Maceió', stateInitials: 'AL' }
-];
 
 export default function CitySelectorModal({ isOpen, onClose, onSelectCity, currentCity }) {
   useEscapeKey(onClose, isOpen);

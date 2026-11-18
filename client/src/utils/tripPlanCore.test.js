@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   shortPlaceName, needsResolve, buildTripPath, formatDuration, formatClock,
   summarizeItinerary, describeLeg, itineraryPoints, resolveTripTime,
-  matchLegToCatalogLine, findInitialStop
+  matchLegToCatalogLine, findInitialStop, buildAutocompletePath, rankPlaceSuggestions
 } from './tripPlanCore.js';
 
 describe('shortPlaceName', () => {
@@ -167,5 +167,33 @@ describe('findInitialStop', () => {
 
   test('cai na primeira parada quando nada casa', () => {
     assert.equal(findInitialStop(stops, { stopName: 'Endereço inexistente' })?.stopId, 's-1');
+  });
+});
+
+describe('buildAutocompletePath & rankPlaceSuggestions', () => {
+  test('buildAutocompletePath não duplica o nome da cidade quando o usuário já digitou e inclui lat/lng', () => {
+    assert.equal(
+      buildAutocompletePath('Terminal Santo Antonio', { cityName: 'Sorocaba', lat: -23.5054, lng: -47.4527 }),
+      '/api/autocomplete?term=Terminal%20Santo%20Antonio%2C%20Sorocaba&lat=-23.5054&lng=-47.4527'
+    );
+    assert.equal(
+      buildAutocompletePath('Terminal Santo Antônio, Sorocaba', { cityName: 'Sorocaba', lat: -23.5054, lng: -47.4527 }),
+      '/api/autocomplete?term=Terminal%20Santo%20Ant%C3%B4nio%2C%20Sorocaba&lat=-23.5054&lng=-47.4527'
+    );
+    assert.equal(
+      buildAutocompletePath('UFSCar Sorocaba', { cityName: 'Sorocaba (GTFS)' }),
+      '/api/autocomplete?term=UFSCar%20Sorocaba'
+    );
+  });
+
+  test('rankPlaceSuggestions prioriza endereços do município ativo e descarta falsos positivos de outras cidades', () => {
+    const raw = [
+      { id: 'botucatu', nome: 'Santo Antônio Sorocaba, brazil, Botucatu, São Paulo, BRA' },
+      { id: 'soro-1', nome: 'Rua Santo Antônio, Brigadeiro Tobias, Sorocaba, São Paulo, 18108, BRA' },
+      { id: 'soro-dup', nome: 'Rua Santo Antônio, Brigadeiro Tobias, Sorocaba, São Paulo, 18108-000, BRA' },
+      { id: 'soro-2', nome: 'Santo Antônio, Avenida Artur Bernardes 367, Sorocaba, São Paulo, 18081-000, BRA' }
+    ];
+    const ranked = rankPlaceSuggestions(raw, 'Sorocaba');
+    assert.deepEqual(ranked.map(p => p.id), ['soro-1', 'soro-2']);
   });
 });

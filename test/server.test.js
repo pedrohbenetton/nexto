@@ -28,7 +28,7 @@ describe('server/index bootstrap & hardening', () => {
     assert.equal(res.status, 404);
   });
 
-  test('rejeita payloads JSON acima de 16kb com 413', async () => {
+  test('rejeita payloads JSON acima de 16kb com 413 em formato JSON', async () => {
     const huge = 'x'.repeat(20 * 1024);
     const res = await fetch(`${baseUrl}/api/crowding/report`, {
       method: 'POST',
@@ -36,5 +36,18 @@ describe('server/index bootstrap & hardening', () => {
       body: JSON.stringify({ vehicleId: huge, level: 'low' })
     });
     assert.equal(res.status, 413);
+    const body = await res.json();
+    assert.ok(body.error);
+  });
+
+  test('rejeita JSON malformado com 400 em formato JSON sem vazar stack trace', async () => {
+    const res = await fetch(`${baseUrl}/api/crowding/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{json_invalido'
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.ok(body.error);
   });
 });
