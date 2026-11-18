@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiUrl } from '../utils/api';
 import { getCurrentPosition } from '../utils/geolocation';
-import { MapPin, Star, Search, Download, Crosshair, Navigation, WifiOff, ChevronDown, X, Route } from 'lucide-react';
+import { MapPin, Star, Search, Download, Crosshair, Navigation, WifiOff, ChevronDown, X, Route, Tv } from 'lucide-react';
 import Logo from './Logo';
 
 export default function Header({ 
@@ -16,7 +16,8 @@ export default function Header({
   onInstallPWA,
   onCityDetected,
   onOpenNearbyStops,
-  onOpenTripPlanner
+  onOpenTripPlanner,
+  onOpenTv
 }) {
   const [detectingGps, setDetectingGps] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -115,6 +116,17 @@ export default function Header({
               <Navigation className="w-4 h-4" />
               <span>Perto de mim</span>
             </button>
+
+            {onOpenTv && (
+              <button
+                onClick={onOpenTv}
+                className="hidden lg:flex h-10 px-3.5 rounded-full border border-line bg-surface hover:border-line-strong text-xs font-semibold text-ink items-center gap-1.5 transition-colors"
+                title="Painel de chegadas ao vivo para Smart TV ou monitores"
+              >
+                <Tv className="w-4 h-4 text-accent" />
+                <span>Painel TV</span>
+              </button>
+            )}
 
             <button
               onClick={onToggleOnlyFavorites}

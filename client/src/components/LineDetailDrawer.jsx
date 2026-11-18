@@ -4,7 +4,7 @@ import { useEscapeKey } from '../utils/useEscapeKey';
 import {
   X, Clock, RefreshCw, AlertCircle,
   Map, CheckCircle2, Navigation, Activity, Bell, BellRing,
-  ArrowLeftRight, Bookmark, Share2
+  ArrowLeftRight, Bookmark, Share2, Tv
 } from 'lucide-react';
 import { PUBLIC_WEB_URL, buildShareUrl, buildShareMessage, shareTrip } from '../utils/shareTrip';
 import { findInitialStop } from '../utils/tripPlanCore';
@@ -19,7 +19,7 @@ import ReliabilityBadge from './ReliabilityBadge';
 import IssueReports from './IssueReports';
 
 export default function LineDetailDrawer({
-  line, onClose, onOpenMap, cityId = 35, initialStopId, initialStopName, savedStops = [], onToggleSavedStop,
+  line, onClose, onOpenMap, onOpenTv, cityId = 35, initialStopId, initialStopName, savedStops = [], onToggleSavedStop,
   onStartAlight, alightStopId, onDetailsCached
 }) {
   useEscapeKey(onClose, true);
@@ -382,6 +382,26 @@ export default function LineDetailDrawer({
                         <Map className="w-3.5 h-3.5" />
                         <span>Ver no mapa</span>
                       </button>
+
+                      {onOpenTv && (
+                        <button
+                          onClick={() => onOpenTv({
+                            stopId: selectedStop.stopId,
+                            stopName: selectedStop.name,
+                            cityId,
+                            cityName: activeLine.cityName || 'Sorocaba',
+                            lines: [activeLine.routeCode],
+                            serviceId: details?.serviceId,
+                            lineRoutesPath: activeLine.lineRoutesPath,
+                            title: `${activeLine.routeCode} · ${selectedStop.name.split(',')[0].trim()}`
+                          })}
+                          className="h-9 px-3.5 rounded-full bg-surface hover:bg-surface-2 border border-line text-xs font-semibold text-ink flex items-center gap-1.5 whitespace-nowrap transition-colors"
+                          title="Abrir como Painel de TV / Monitor deste Ponto"
+                        >
+                          <Tv className="w-3.5 h-3.5 text-accent" />
+                          <span>Painel TV</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 

@@ -7,6 +7,8 @@ import CitySelectorModal from './components/CitySelectorModal';
 import NearbyStopsModal from './components/NearbyStopsModal';
 
 const MapView = lazy(() => import('./components/MapView'));
+const TvView = lazy(() => import('./components/TvView'));
+import TvConfigModal from './components/TvConfigModal';
 import FilterPills from './components/FilterPills';
 import EmptyState from './components/EmptyState';
 import { LineListSkeleton } from './components/Skeleton';
@@ -24,6 +26,12 @@ import BottomNav from './components/BottomNav';
 import TripPlannerModal from './components/TripPlannerModal';
 
 export default function App() {
+  const isTvRoute = typeof window !== 'undefined' && (
+    window.location.pathname === '/tv' ||
+    window.location.pathname.startsWith('/tv/') ||
+    new URLSearchParams(window.location.search).get('tv') === '1'
+  );
+
   // Estado da Cidade Ativa (padrão: Sorocaba - SP)
   const [currentCity, setCurrentCity] = useState(() => {
     try {
@@ -87,6 +95,8 @@ export default function App() {
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [isNearbyModalOpen, setIsNearbyModalOpen] = useState(false);
   const [isTripOpen, setIsTripOpen] = useState(false);
+  const [isTvConfigOpen, setIsTvConfigOpen] = useState(false);
+  const [tvConfigParams, setTvConfigParams] = useState(null);
 
   // PWA Install Prompt
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -296,6 +306,19 @@ export default function App() {
 
   const bottomNavActive = isTripOpen ? 'trip' : isNearbyModalOpen ? 'nearby' : isCityModalOpen ? 'city' : showOnlyFavorites ? 'favorites' : 'lines';
 
+  if (isTvRoute) {
+    return (
+      <Suspense fallback={
+        <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center text-slate-400 font-mono text-sm gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+          <span>Iniciando Nexto TV...</span>
+        </div>
+      }>
+        <TvView />
+      </Suspense>
+    );
+  }
+
   return (
     <div className="relative min-h-screen bg-canvas text-ink flex flex-col font-sans overflow-x-hidden selection:bg-brand selection:text-on-brand">
 
@@ -311,6 +334,13 @@ export default function App() {
         onInstallPWA={handleInstallPWA}
         onOpenNearbyStops={() => setIsNearbyModalOpen(true)}
         onOpenTripPlanner={() => setIsTripOpen(true)}
+        onOpenTv={() => {
+          setTvConfigParams({
+            cityId: currentCity?.cityId || 35,
+            cityName: currentCity?.cityName || 'Sorocaba'
+          });
+          setIsTvConfigOpen(true);
+        }}
         onCityDetected={(city) => {
           setCurrentCity(city);
           setSearchTerm('');
@@ -465,6 +495,14 @@ export default function App() {
           onOpenMap={(details, selectedStop, activeLine) => {
             setMapData({ line: activeLine || selectedLine, details, selectedStop });
           }}
+          onOpenTv={(tvParams) => {
+            setTvConfigParams({
+              cityId: currentCity?.cityId || 35,
+              cityName: currentCity?.cityName || 'Sorocaba',
+              ...tvParams
+            });
+            setIsTvConfigOpen(true);
+          }}
         />
       )}
 
@@ -530,6 +568,19 @@ export default function App() {
         onSelectCity={(city) => {
           setCurrentCity(city);
           setSearchTerm('');
+        }}
+      />
+
+      {/* Modal de Configuração do Painel TV */}
+      <TvConfigModal
+        isOpen={isTvConfigOpen}
+        onClose={() => {
+          setIsTvConfigOpen(false);
+          setTvConfigParams(null);
+        }}
+        initialParams={tvConfigParams || {
+          cityId: currentCity?.cityId || 35,
+          cityName: currentCity?.cityName || 'Sorocaba'
         }}
       />
     </div>
