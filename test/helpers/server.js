@@ -20,6 +20,7 @@ async function startApi() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     }),
+    delete: path => fetch(`${baseUrl}${path}`, { method: 'DELETE' }),
     close: () => new Promise(resolve => server.close(resolve))
   };
 }

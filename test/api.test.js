@@ -415,3 +415,53 @@ describe('GET /api/trip', () => {
     assert.equal(body.error, 'falhou');
   });
 });
+
+describe('/api/radar', () => {
+  test('GET /api/radar/link valida parâmetros obrigatórios e retorna link deep-link', async () => {
+    assert.equal((await api.get('/radar/link?serviceId=s1')).status, 400);
+    assert.equal((await api.get('/radar/link?stopId=p1')).status, 400);
+
+    const { status, body } = await json(api.get('/radar/link?serviceId=s1&stopId=p1&leadMinutes=10'));
+    assert.equal(status, 200);
+    assert.equal(body.success, true);
+    assert.ok(body.url.includes('alert_s1_p1_10'));
+  });
+
+  test('POST /api/radar/subscribe valida parâmetros e cadastra radar', async () => {
+    assert.equal((await api.post('/radar/subscribe', { serviceId: 's1' })).status, 400);
+
+    const payload = {
+      chatId: 'test_chat_888',
+      serviceId: 'srv-teste',
+      stopId: 'stop-teste',
+      lineCode: '80',
+      leadMinutes: 8
+    };
+
+    const { status, body } = await json(api.post('/radar/subscribe', payload));
+    assert.equal(status, 200);
+    assert.equal(body.success, true);
+    assert.equal(body.data.chatId, 'test_chat_888');
+
+    // Listagem por chatId
+    const listRes = await json(api.get('/radar/alerts?chatId=test_chat_888'));
+    assert.equal(listRes.status, 200);
+    assert.equal(listRes.body.count, 1);
+
+    // Cancelamento
+    const delRes = await json(api.delete(`/radar/alerts/${body.data.id}`));
+    assert.equal(delRes.status, 200);
+    assert.equal(delRes.body.removed, true);
+
+    // Cancelamento 404 para ID inexistente
+    assert.equal((await api.delete('/radar/alerts/sub_inexistente')).status, 404);
+  });
+
+  test('POST /api/radar/telegram-webhook processa payload e retorna ok', async () => {
+    const { status, body } = await json(api.post('/radar/telegram-webhook', {
+      message: { chat: { id: 123 }, text: '/ajuda' }
+    }));
+    assert.equal(status, 200);
+    assert.equal(body.ok, true);
+  });
+});

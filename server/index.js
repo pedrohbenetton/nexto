@@ -5,6 +5,7 @@ const path = require('path');
 const apiRoutes = require('./routes/api');
 const predictionHistory = require('./predictionHistory');
 const crowdingRegistry = require('./crowdingRegistry');
+const radarAlerts = require('./radarAlerts');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -76,9 +77,15 @@ function startServer(port = PORT) {
     console.log('====================================================');
   });
 
+  if (!process.env.NODE_TEST_CONTEXT) {
+    radarAlerts.startPolling();
+  }
+
   const shutdown = () => {
     predictionHistory.flush();
     crowdingRegistry.flush();
+    radarAlerts.stopPolling();
+    radarAlerts.save();
     if (server) {
       server.close(() => process.exit(0));
     } else {

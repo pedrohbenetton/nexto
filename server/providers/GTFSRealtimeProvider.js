@@ -1,6 +1,7 @@
 const BaseTransitProvider = require('./BaseTransitProvider');
 const axios = require('axios');
 const cache = require('../cache');
+const spTransProvider = require('./SPTransProvider');
 
 /**
  * GTFSRealtimeProvider
@@ -29,7 +30,7 @@ class GTFSRealtimeProvider extends BaseTransitProvider {
     const q = query.toLowerCase();
     const matches = [];
     if ('são paulo'.includes(q) || 'sp'.includes(q)) {
-      matches.push({ cityId: 9001, cityName: 'São Paulo (GTFS Aberto)', stateInitials: 'SP', countryName: 'Brasil' });
+      matches.push({ cityId: 9001, cityName: 'São Paulo (SPTrans Olho Vivo)', stateInitials: 'SP', countryName: 'Brasil' });
     }
     if ('rio de janeiro'.includes(q) || 'rj'.includes(q)) {
       matches.push({ cityId: 9002, cityName: 'Rio de Janeiro (GTFS Aberto)', stateInitials: 'RJ', countryName: 'Brasil' });
@@ -38,6 +39,10 @@ class GTFSRealtimeProvider extends BaseTransitProvider {
   }
 
   async getLines(cityId) {
+    if (parseInt(cityId, 10) === 9001) {
+      return spTransProvider.getLines(cityId);
+    }
+
     // Fallback estruturado para demonstração e integração contínua de feeds abertos
     const cacheKey = `gtfs:lines:${cityId}`;
     const cached = cache.get(cacheKey);
@@ -75,6 +80,10 @@ class GTFSRealtimeProvider extends BaseTransitProvider {
   }
 
   async getLineDetails(linePath) {
+    if (linePath && (linePath.includes('-sp-cl-') || linePath.startsWith('gtfs-sp-cl-'))) {
+      return spTransProvider.getLineDetails(linePath);
+    }
+
     return {
       lineRoutesPath: linePath,
       serviceId: `gtfs-srv-${linePath}`,
@@ -91,6 +100,10 @@ class GTFSRealtimeProvider extends BaseTransitProvider {
   }
 
   async getLineTracking(linePath, serviceId, cityId) {
+    if ((linePath && linePath.includes('-sp-cl-')) || (serviceId && serviceId.includes('-sp-srv-'))) {
+      return spTransProvider.getLineTracking(linePath, serviceId, cityId);
+    }
+
     return {
       serviceId: serviceId || `gtfs-${linePath}`,
       lineRoutesPath: linePath,
@@ -139,6 +152,10 @@ class GTFSRealtimeProvider extends BaseTransitProvider {
   }
 
   async getStopPredictions(serviceId, stopId) {
+    if (serviceId && serviceId.includes('-sp-srv-')) {
+      return spTransProvider.getStopPredictions(serviceId, stopId);
+    }
+
     return {
       routeCode: "GTFS-FEED",
       routeMnemonic: "FEED MUNICIPAL ABERTO",

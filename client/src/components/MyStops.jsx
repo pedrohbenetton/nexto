@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookmarkX, MapPin, WifiOff, Pin, PinOff } from 'lucide-react';
+import { BookmarkX, MapPin, WifiOff, Pin, PinOff, Bell } from 'lucide-react';
 import { apiUrl } from '../utils/api';
 import { savedStopKey, upcomingArrivals } from '../utils/savedStops';
 import { putSnapshot, projectSnapshot, pruneSnapshots, loadSnapshots, storeSnapshots } from '../utils/offlineArrivals';
@@ -11,6 +11,7 @@ import { tapFeedback } from '../utils/haptics';
 import LinePlate from './LinePlate';
 import ReliabilityBadge from './ReliabilityBadge';
 import { SkeletonBlock } from './Skeleton';
+import RadarModal from './RadarModal';
 
 const REFRESH_MS = 20000;
 
@@ -132,6 +133,7 @@ function Arrivals({ state }) {
 export default function MyStops({ savedStops, onOpen, onRemove }) {
   const departures = useStopDepartures(savedStops);
   const [pinned, setPinned] = useState({}); // key -> true
+  const [radarEntry, setRadarEntry] = useState(null);
   const nativePin = canPinNotifications();
 
   // Mantém as notificações fixas sincronizadas com cada atualização de previsão
@@ -196,13 +198,22 @@ export default function MyStops({ savedStops, onOpen, onRemove }) {
                   type="button"
                   onClick={() => togglePin(entry)}
                   aria-pressed={Boolean(pinned[key])}
-                  className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-2 ${pinned[key] ? 'text-accent' : 'text-faint hover:text-ink'}`}
+                  className={`absolute bottom-2 right-10 w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-2 ${pinned[key] ? 'text-accent' : 'text-faint hover:text-ink'}`}
                   aria-label={pinned[key] ? 'Desafixar da barra de notificações' : 'Fixar na barra de notificações'}
                   title={pinned[key] ? 'Desafixar da barra' : 'Fixar na barra de notificações'}
                 >
                   {pinned[key] ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setRadarEntry(entry)}
+                className={`absolute bottom-2 ${nativePin ? 'right-2' : 'right-2'} w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-2 text-faint hover:text-accent transition-colors`}
+                aria-label={`Criar alerta no Telegram para ${entry.stopName}`}
+                title="Alerta no Telegram (Nexto+)"
+              >
+                <Bell className="w-4 h-4" />
+              </button>
               <button
                 type="button"
                 onClick={() => removeStop(entry)}
@@ -216,6 +227,33 @@ export default function MyStops({ savedStops, onOpen, onRemove }) {
           );
         })}
       </ul>
+
+      {savedStops.length > 0 && (
+        <div className="p-3 bg-surface-2 border border-line rounded-[18px] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
+              <Bell className="w-4 h-4 text-accent" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-ink">Nexto+ Radar no Telegram</p>
+              <p className="text-[11px] text-muted truncate">Avisos automáticos quando o ônibus estiver a caminho</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRadarEntry(savedStops[0])}
+            className="px-3 py-1.5 rounded-[10px] bg-brand text-brand-fg text-xs font-semibold shrink-0 hover:opacity-90 transition-opacity"
+          >
+            Configurar
+          </button>
+        </div>
+      )}
+
+      <RadarModal
+        isOpen={Boolean(radarEntry)}
+        onClose={() => setRadarEntry(null)}
+        entry={radarEntry}
+      />
     </section>
   );
 }

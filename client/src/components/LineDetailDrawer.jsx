@@ -17,6 +17,7 @@ import { LineDetailSkeleton, PredictionSkeleton } from './Skeleton';
 import LinePlate from './LinePlate';
 import ReliabilityBadge from './ReliabilityBadge';
 import IssueReports from './IssueReports';
+import RadarModal from './RadarModal';
 
 export default function LineDetailDrawer({
   line, onClose, onOpenMap, onOpenTv, cityId = 35, initialStopId, initialStopName, savedStops = [], onToggleSavedStop,
@@ -33,6 +34,7 @@ export default function LineDetailDrawer({
   const [predictions, setPredictions] = useState(null);
   const [predLoading, setPredLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [radarEntry, setRadarEntry] = useState(null);
   const [error, setError] = useState(null);
 
   // Alerta de Proximidade do Ônibus
@@ -402,6 +404,20 @@ export default function LineDetailDrawer({
                           <span>Painel TV</span>
                         </button>
                       )}
+
+                      <button
+                        onClick={() => setRadarEntry({
+                          serviceId: details?.serviceId,
+                          stopId: selectedStop.stopId,
+                          stopName: selectedStop.name,
+                          line: activeLine
+                        })}
+                        className="h-9 px-3.5 rounded-full bg-surface hover:bg-surface-2 border border-line text-xs font-semibold text-ink flex items-center gap-1.5 whitespace-nowrap transition-colors"
+                        title="Criar alerta no Telegram quando o ônibus estiver chegando"
+                      >
+                        <Bell className="w-3.5 h-3.5 text-accent" />
+                        <span>Alerta Telegram</span>
+                      </button>
                     </div>
                   </div>
 
@@ -656,6 +672,12 @@ export default function LineDetailDrawer({
         </div>
 
       </div>
+
+      <RadarModal
+        isOpen={Boolean(radarEntry)}
+        onClose={() => setRadarEntry(null)}
+        entry={radarEntry}
+      />
     </div>
   );
 }

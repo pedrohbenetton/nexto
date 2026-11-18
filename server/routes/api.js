@@ -5,12 +5,13 @@ const crowding = require('../crowdingRegistry');
 const predictionHistory = require('../predictionHistory');
 const providerRegistry = require('../providers/ProviderRegistry');
 const nearbyStops = require('../nearbyStops');
+const radarAlerts = require('../radarAlerts');
 
 // Rota Raiz da API (/api)
 router.get('/', (req, res) => {
   res.json({
     service: 'Nexto API Gateway',
-    version: '1.3.0',
+    version: '1.4.0',
     status: 'online',
     webAppUrl: 'http://localhost:3001',
     description: 'BFF soberano de alta velocidade para transporte público em tempo real sem anúncios.',
@@ -29,7 +30,12 @@ router.get('/', (req, res) => {
       placeResolve: '/api/places/resolve?text={termo}&key={id}',
       stopsNearby: '/api/stops/nearby?lat={lat}&lng={lng}&cityId={cityId}&radius={metros}',
       crowdingBatch: '/api/crowding?ids={v1,v2}',
-      issues: '/api/issues/{subjectId}'
+      issues: '/api/issues/{subjectId}',
+      radarLink: '/api/radar/link?serviceId={serviceId}&stopId={stopId}&leadMinutes={minutos}',
+      radarSubscribe: 'POST /api/radar/subscribe',
+      radarAlerts: 'GET /api/radar/alerts?chatId={chatId}',
+      radarUnsubscribe: 'DELETE /api/radar/alerts/{id}',
+      radarTelegramWebhook: 'POST /api/radar/telegram-webhook'
     }
   });
 });
@@ -350,6 +356,52 @@ router.get('/crowding/:vehicleId', (req, res) => {
     res.json({ success: true, data: status });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 8. Nexto+ Radar - Alertas Proativos no Telegram
+router.get('/radar/link', (req, res) => {
+  const { serviceId, stopId, leadMinutes } = req.query;
+  if (!serviceId || !stopId) {
+    return res.status(400).json({ error: 'serviceId e stopId são obrigatórios' });
+  }
+  const lead = leadMinutes ? parseInt(leadMinutes, 10) : 8;
+  const link = radarAlerts.getDeepLink(serviceId, stopId, lead);
+  res.json({ success: true, url: link });
+});
+
+router.post('/radar/subscribe', (req, res) => {
+  try {
+    const { chatId, serviceId, stopId } = req.body || {};
+    if (!chatId || !serviceId || !stopId) {
+      return res.status(400).json({ error: 'chatId, serviceId e stopId são obrigatórios' });
+    }
+    const sub = radarAlerts.subscribe(req.body);
+    res.json({ success: true, data: sub });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/radar/alerts', (req, res) => {
+  const list = radarAlerts.list(req.query.chatId);
+  res.json({ success: true, count: list.length, data: list });
+});
+
+router.delete('/radar/alerts/:id', (req, res) => {
+  const removed = radarAlerts.unsubscribe(req.params.id);
+  if (!removed) {
+    return res.status(404).json({ success: false, error: 'Alerta não encontrado' });
+  }
+  res.json({ success: true, removed: true });
+});
+
+router.post('/radar/telegram-webhook', async (req, res) => {
+  try {
+    const result = await radarAlerts.handleTelegramWebhook(req.body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
