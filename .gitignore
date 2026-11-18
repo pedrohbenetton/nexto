@@ -34,10 +34,10 @@ scripts/serverApp-state.json
 scripts/cittamobi_main.js
 scripts/route-line.js
 
-# Local cache
+# Local cache & persisted runtime state
 server/data/*.cache
-server/data/stop_coords_cache.json
-server/data/routes_geometry_cache.json
+server/data/*.tmp
+server/data/*.json
 
 # Local secrets/tokens
 tokens.json

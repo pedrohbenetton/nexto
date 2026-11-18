@@ -1,9 +1,12 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const cache = require('../server/cache');
 const crowding = require('../server/crowdingRegistry');
+const { CrowdingRegistry } = crowding;
 const nearbyStopsModule = require('../server/nearbyStops');
 const { haversineDistance, findNearbyStops } = nearbyStopsModule;
 const cittaService = require('../server/cittamobiService');
@@ -105,6 +108,30 @@ describe('CrowdingRegistry - relatos de problemas', () => {
     assert.equal(crowding.getIssues('p-exp').length, 1);
     t.mock.timers.tick(3 * 60 * 60 * 1000);
     assert.deepEqual(crowding.getIssues('p-exp'), []);
+  });
+
+  test('persiste lotação e relatos de problemas em disco e poda expirados ao recarregar', t => {
+    t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexto-crowd-'));
+    const filePath = path.join(dir, 'crowding_state.json');
+
+    try {
+      const c1 = new CrowdingRegistry({ filePath, debounceMs: 0 });
+      c1.addReport('bus-10', 'high');
+      c1.addIssue('bus-10', 'no_ac');
+      c1.addIssue('stop-99', 'unsafe_night');
+      c1.flush();
+
+      // Avança 40 min: votos de ônibus (35 min) expiram; relato de ponto (3 h) permanece
+      t.mock.timers.tick(40 * 60 * 1000);
+      const c2 = new CrowdingRegistry({ filePath, debounceMs: 0 });
+      assert.equal(c2.getCrowding('bus-10').level, 'unknown');
+      assert.deepEqual(c2.getIssues('bus-10'), []);
+      assert.equal(c2.getIssues('stop-99').length, 1);
+      assert.equal(c2.getIssues('stop-99')[0].type, 'unsafe_night');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

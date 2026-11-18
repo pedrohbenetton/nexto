@@ -1,5 +1,8 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { PredictionHistory } = require('../server/predictionHistory');
 
 const MIN = 60 * 1000;
@@ -127,5 +130,44 @@ describe('PredictionHistory', () => {
     h.record('s1', 'p1', null);
     h.record('s1', 'p1', [{ isRealTime: true, secondsUntilArrival: 100 }]);
     assert.equal(h.getReliability('s1', 'p1').samples, 0);
+  });
+
+  test('persiste em disco e restaura amostras e fantasmas ao recarregar', (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexto-pred-'));
+    const filePath = path.join(dir, 'prediction_history.json');
+
+    try {
+      const h1 = new PredictionHistory({ filePath, debounceMs: 0 });
+      const base = 1_700_000_000_000;
+      for (let i = 0; i < 3; i++) {
+        simulateTrip(h1, t, `v${i}`, { drift: 180, start: base + i * 60 * MIN });
+      }
+      h1.record('s1', 'p1', [veh('ghost-1', 900)]);
+      t.mock.timers.tick(2 * MIN);
+      h1.record('s1', 'p1', []);
+      h1.flush();
+
+      const h2 = new PredictionHistory({ filePath, debounceMs: 0 });
+      const rel = h2.getReliability('s1', 'p1');
+      assert.equal(rel.level, 'late');
+      assert.equal(rel.samples, 3);
+      assert.equal(rel.medianDriftMin, 3);
+      assert.equal(rel.ghosts, 1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('ignora arquivo de persistência corrompido sem quebrar', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexto-pred-bad-'));
+    const filePath = path.join(dir, 'prediction_history.json');
+    fs.writeFileSync(filePath, '{json-invalido', 'utf8');
+    try {
+      const h = new PredictionHistory({ filePath, debounceMs: 0 });
+      assert.equal(h.getReliability('s1', 'p1').level, 'unknown');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
