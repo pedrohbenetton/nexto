@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import {
   X, ArrowUpDown, Route, Footprints, Clock, AlertCircle,
   ChevronRight, Bus, Home, Briefcase, Plus
@@ -20,8 +20,9 @@ import {
 } from '../utils/savedPlacesCore';
 import PlaceInput from './PlaceInput';
 import LinePlate from './LinePlate';
-import TripRouteMap from './TripRouteMap';
 import EmptyState from './EmptyState';
+
+const TripRouteMap = lazy(() => import('./TripRouteMap'));
 
 const SLOT_ICONS = {
   home: Home,
@@ -307,7 +308,9 @@ export default function TripPlannerModal({ isOpen, onClose, cityName, lines = []
 
               {current && (
                 <div className="space-y-3 pt-1">
-                  <TripRouteMap itinerary={current} />
+                  <Suspense fallback={<div className="w-full h-64 rounded-[16px] skeleton border border-line" />}>
+                    <TripRouteMap itinerary={current} />
+                  </Suspense>
                   <ol className="space-y-2">
                     {current.legs.map((leg, i) => {
                       if (leg.isWalk) {

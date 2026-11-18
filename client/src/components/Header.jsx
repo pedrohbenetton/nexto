@@ -12,7 +12,6 @@ export default function Header({
   showOnlyFavorites,
   onToggleOnlyFavorites,
   favoritesCount,
-  totalLinesCount,
   installPrompt,
   onInstallPWA,
   onCityDetected,
@@ -21,6 +20,7 @@ export default function Header({
 }) {
   const [detectingGps, setDetectingGps] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [gpsNotice, setGpsNotice] = useState(null);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -62,8 +62,10 @@ export default function Header({
       },
       (err) => {
         setDetectingGps(false);
-        if (err.code === 'UNSUPPORTED') alert('Geolocalização não suportada neste dispositivo.');
-        console.warn('Erro de GPS:', err);
+        setGpsNotice(err?.code === 'UNSUPPORTED'
+          ? 'Geolocalização não suportada neste dispositivo.'
+          : 'Não foi possível detectar a cidade pelo GPS.');
+        setTimeout(() => setGpsNotice(null), 4000);
       }
     );
   };
@@ -74,6 +76,11 @@ export default function Header({
         <div className="bg-danger-soft text-danger text-xs font-semibold px-4 py-1.5 flex items-center justify-center gap-1.5">
           <WifiOff className="w-3.5 h-3.5" />
           <span>Sem conexão: mostrando dados salvos</span>
+        </div>
+      )}
+      {gpsNotice && (
+        <div className="bg-warn-soft text-warn text-xs font-semibold px-4 py-1.5 text-center">
+          {gpsNotice}
         </div>
       )}
 

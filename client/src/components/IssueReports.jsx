@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiUrl } from '../utils/api';
 
-export const ISSUE_OPTIONS = {
+const ISSUE_OPTIONS = {
   no_ac: 'Sem ar',
   broken: 'Quebrado',
   unsafe_night: 'Inseguro à noite'
@@ -9,17 +9,24 @@ export const ISSUE_OPTIONS = {
 
 // Relatos colaborativos: mostra os problemas recentes e permite reportar novos.
 export default function IssueReports({ subjectId, types }) {
-  const [issues, setIssues] = useState([]);
+  const [state, setState] = useState({ id: '', list: [] });
 
   useEffect(() => {
+    if (!subjectId) return undefined;
     let cancelled = false;
-    setIssues([]);
-    fetch(apiUrl(`/api/issues/${encodeURIComponent(subjectId)}`))
+    const targetId = String(subjectId);
+    fetch(apiUrl(`/api/issues/${encodeURIComponent(targetId)}`))
       .then(r => r.json())
-      .then(j => { if (!cancelled && j.success) setIssues(j.data); })
+      .then(j => {
+        if (!cancelled && j.success) {
+          setState({ id: targetId, list: j.data || [] });
+        }
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [subjectId]);
+
+  const issues = state.id === String(subjectId) ? state.list : [];
 
   const report = async (type) => {
     try {
@@ -29,7 +36,9 @@ export default function IssueReports({ subjectId, types }) {
         body: JSON.stringify({ subjectId, type })
       });
       const json = await res.json();
-      if (json.success) setIssues(json.data);
+      if (json.success) {
+        setState({ id: String(subjectId), list: json.data || [] });
+      }
     } catch (e) {
       console.warn('Erro ao registrar relato:', e);
     }
@@ -47,6 +56,7 @@ export default function IssueReports({ subjectId, types }) {
         {types.map(type => (
           <button
             key={type}
+            type="button"
             onClick={() => report(type)}
             className="px-2 py-0.5 rounded-[8px] bg-surface hover:bg-warn-soft text-warn border border-line transition-colors"
           >

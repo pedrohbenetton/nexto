@@ -1,68 +1,79 @@
 import React, { useState, useEffect } from 'react';
 import { apiUrl } from '../utils/api';
-import { Search, MapPin, X, Loader2, Globe } from 'lucide-react';
+import { useEscapeKey } from '../utils/useEscapeKey';
+import { Search, X, Loader2, Globe } from 'lucide-react';
+
+const POPULAR_CITIES = [
+  { cityId: 35, cityName: 'Sorocaba', stateInitials: 'SP' },
+  { cityId: 1, cityName: 'São Paulo', stateInitials: 'SP' },
+  { cityId: 10, cityName: 'Salvador', stateInitials: 'BA' },
+  { cityId: 14, cityName: 'Belo Horizonte', stateInitials: 'MG' },
+  { cityId: 18, cityName: 'Recife', stateInitials: 'PE' },
+  { cityId: 22, cityName: 'Maceió', stateInitials: 'AL' }
+];
 
 export default function CitySelectorModal({ isOpen, onClose, onSelectCity, currentCity }) {
+  useEscapeKey(onClose, isOpen);
+
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [popularCities] = useState([
-    { cityId: 35, cityName: 'Sorocaba', stateInitials: 'SP' },
-    { cityId: 1, cityName: 'São Paulo', stateInitials: 'SP' },
-    { cityId: 10, cityName: 'Salvador', stateInitials: 'BA' },
-    { cityId: 14, cityName: 'Belo Horizonte', stateInitials: 'MG' },
-    { cityId: 18, cityName: 'Recife', stateInitials: 'PE' },
-    { cityId: 22, cityName: 'Maceió', stateInitials: 'AL' }
-  ]);
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
+    const trimmed = query.trim();
+    if (!trimmed) return undefined;
 
+    let active = true;
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(apiUrl(`/api/cities?q=${encodeURIComponent(query.trim())}`));
+        const res = await fetch(apiUrl(`/api/cities?q=${encodeURIComponent(trimmed)}`));
         const data = await res.json();
-        if (data.success && data.data) {
+        if (active && data.success && data.data) {
           setResults(data.data);
         }
       } catch (err) {
         console.error('Erro ao buscar cidades:', err);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }, 250);
 
-    return () => clearTimeout(timer);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [query]);
 
   if (!isOpen) return null;
 
+  const hasQuery = query.trim().length > 0;
+  const shownResults = hasQuery ? results : [];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-safe-4 bg-scrim backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-md bg-surface border border-line rounded-[24px] shadow-lift overflow-hidden flex flex-col max-h-[85vh]">
-        
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-scrim backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-md bg-surface border-t sm:border border-line rounded-t-[28px] sm:rounded-[28px] overflow-hidden flex flex-col max-h-[85vh] pb-safe sm:pb-0">
+
         {/* Header */}
         <div className="px-5 py-4 border-b border-line bg-surface flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-[12px] bg-brand-soft flex items-center justify-center text-accent">
+            <div className="w-9 h-9 rounded-[12px] bg-brand-soft flex items-center justify-center text-accent">
               <Globe className="w-4 h-4 text-accent" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-ink">
-                Selecionar Cidade
+              <h2 className="font-display text-base font-bold text-ink">
+                Escolher cidade
               </h2>
               <p className="text-xs text-muted">
-                Consulte horários e frota em tempo real
+                Linhas e ônibus ao vivo do município
               </p>
             </div>
           </div>
-          <button 
+          <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-[12px] text-muted hover:text-ink hover:bg-surface-2 transition-colors"
+            aria-label="Fechar"
+            className="w-10 h-10 rounded-full text-muted hover:text-ink hover:bg-surface-2 flex items-center justify-center transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -71,93 +82,101 @@ export default function CitySelectorModal({ isOpen, onClose, onSelectCity, curre
         {/* Input de Busca */}
         <div className="p-4 border-b border-line bg-surface">
           <div className="relative">
-            <Search className="absolute left-3.5 top-3 w-4 h-4 text-muted" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input
               type="text"
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Digite o município (ex: Sorocaba, Salvador)..."
-              className="w-full pl-10 pr-4 py-2.5 bg-surface-2 focus:bg-surface border border-line focus:border-accent rounded-[12px] text-sm text-ink placeholder-muted focus:outline-none transition-all shadow-sm"
+              placeholder="Buscar cidade (ex.: Sorocaba, Salvador)..."
+              className="w-full h-11 pl-10 pr-9 bg-surface-2 focus:bg-surface border border-line focus:border-brand rounded-[14px] text-sm text-ink placeholder:text-muted focus:outline-none transition-colors"
             />
             {loading && (
-              <Loader2 className="absolute right-3.5 top-3 w-4 h-4 text-accent animate-spin" />
+              <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-accent animate-spin" />
             )}
           </div>
         </div>
 
         {/* Lista de Cidades */}
-        <div className="overflow-y-auto flex-1 p-3 divide-y divide-surface-2">
-          {query.trim().length > 0 ? (
-            results.length > 0 ? (
-              results.map((c) => (
-                <button
-                  key={c.cityId}
-                  onClick={() => {
-                    onSelectCity(c);
-                    onClose();
-                  }}
-                  className={`w-full text-left p-3 rounded-[12px] flex items-center justify-between transition-colors ${
-                    currentCity?.cityId === c.cityId 
-                      ? 'bg-brand-soft border border-accent/50 text-accent' 
-                      : 'hover:bg-surface-2 text-ink'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-[12px] bg-surface-2 border border-line flex items-center justify-center text-xs font-bold text-accent">
-                      {c.stateInitials}
+        <div className="overflow-y-auto flex-1 p-3 space-y-1">
+          {hasQuery ? (
+            shownResults.length > 0 ? (
+              shownResults.map((c) => {
+                const isSelected = currentCity?.cityId === c.cityId;
+                return (
+                  <button
+                    key={c.cityId}
+                    type="button"
+                    onClick={() => {
+                      onSelectCity(c);
+                      onClose();
+                    }}
+                    className={`w-full text-left p-3 rounded-[16px] flex items-center justify-between transition-colors ${
+                      isSelected
+                        ? 'bg-brand-soft border border-brand text-ink'
+                        : 'hover:bg-surface-2 border border-transparent text-ink'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-[10px] bg-surface-2 border border-line flex items-center justify-center text-xs font-bold text-accent">
+                        {c.stateInitials}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-ink">{c.cityName}</p>
+                        <p className="text-xs text-muted">{c.stateInitials}{c.countryName ? ` · ${c.countryName}` : ''}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-sm text-ink">{c.cityName}</p>
-                      <p className="text-xs text-muted">{c.stateInitials} • Código #{c.cityId}</p>
-                    </div>
-                  </div>
-                  {currentCity?.cityId === c.cityId && (
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand text-on-brand">
-                      Selecionado
-                    </span>
-                  )}
-                </button>
-              ))
+                    {isSelected && (
+                      <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-brand text-on-brand">
+                        Atual
+                      </span>
+                    )}
+                  </button>
+                );
+              })
             ) : !loading ? (
               <div className="p-8 text-center text-sm text-muted">
-                Nenhum município localizado para "{query}".
+                Nenhuma cidade encontrada para "{query.trim()}".
               </div>
             ) : null
           ) : (
             <div>
-              <p className="text-xs font-semibold text-muted px-2 py-2 uppercase tracking-wider">
-                Principais Cidades Atendidas
+              <p className="text-[11px] font-semibold text-muted px-2 py-2 uppercase tracking-wider">
+                Principais cidades
               </p>
-              {popularCities.map((c) => (
-                <button
-                  key={c.cityId}
-                  onClick={() => {
-                    onSelectCity(c);
-                    onClose();
-                  }}
-                  className={`w-full text-left p-3 rounded-[12px] flex items-center justify-between transition-colors ${
-                    currentCity?.cityId === c.cityId 
-                      ? 'bg-brand-soft border border-accent/50 text-accent' 
-                      : 'hover:bg-surface-2 text-ink'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-[12px] bg-surface-2 border border-line flex items-center justify-center text-xs font-bold text-accent">
-                      {c.stateInitials}
+              {POPULAR_CITIES.map((c) => {
+                const isSelected = currentCity?.cityId === c.cityId;
+                return (
+                  <button
+                    key={c.cityId}
+                    type="button"
+                    onClick={() => {
+                      onSelectCity(c);
+                      onClose();
+                    }}
+                    className={`w-full text-left p-3 rounded-[16px] flex items-center justify-between transition-colors ${
+                      isSelected
+                        ? 'bg-brand-soft border border-brand text-ink'
+                        : 'hover:bg-surface-2 border border-transparent text-ink'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-[10px] bg-surface-2 border border-line flex items-center justify-center text-xs font-bold text-accent">
+                        {c.stateInitials}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-ink">{c.cityName}</p>
+                        <p className="text-xs text-muted">{c.stateInitials}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-sm text-ink">{c.cityName}</p>
-                      <p className="text-xs text-muted">Rede Metropolitana #{c.cityId}</p>
-                    </div>
-                  </div>
-                  {currentCity?.cityId === c.cityId && (
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-brand text-on-brand">
-                      Ativo
-                    </span>
-                  )}
-                </button>
-              ))}
+                    {isSelected && (
+                      <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-brand text-on-brand">
+                        Atual
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

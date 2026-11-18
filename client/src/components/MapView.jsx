@@ -79,7 +79,8 @@ export default function MapView({ line, details, selectedStop, cityId = 35, onCl
   const [locatingUser, setLocatingUser] = useState(false);
   const [gpsError, setGpsError] = useState(null);
 
-  const isOriginalLine = currentLine?.lineRoutesPath === line?.lineRoutesPath;
+  const lineRoutesPath = currentLine?.lineRoutesPath;
+  const isOriginalLine = lineRoutesPath === line?.lineRoutesPath;
   const activeServiceId = isOriginalLine ? (details?.serviceId || '') : '';
 
   const closestStopInfo = userLocation && trackingData?.stops
@@ -100,11 +101,11 @@ export default function MapView({ line, details, selectedStop, cityId = 35, onCl
   }, [currentLine?.routeCode, cityId]);
 
   const fetchTracking = useCallback(async (showLoader = false) => {
-    if (!currentLine?.lineRoutesPath) return;
+    if (!lineRoutesPath) return;
     if (showLoader) setLoading(true);
     try {
       const res = await fetch(apiUrl(
-        `/api/lines/tracking?path=${encodeURIComponent(currentLine.lineRoutesPath)}&serviceId=${encodeURIComponent(activeServiceId)}&cityId=${cityId}`
+        `/api/lines/tracking?path=${encodeURIComponent(lineRoutesPath)}&serviceId=${encodeURIComponent(activeServiceId)}&cityId=${cityId}`
       ));
       const json = await res.json();
       if (json.success && json.data) {
@@ -116,7 +117,7 @@ export default function MapView({ line, details, selectedStop, cityId = 35, onCl
     } finally {
       if (showLoader) setLoading(false);
     }
-  }, [currentLine?.lineRoutesPath, activeServiceId, cityId]);
+  }, [lineRoutesPath, activeServiceId, cityId]);
 
   // Inicialização do Mapa Leaflet
   useEffect(() => {

@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { apiUrl } from './utils/api';
 import Header from './components/Header';
 import LineCard from './components/LineCard';
 import LineDetailDrawer from './components/LineDetailDrawer';
-import MapView from './components/MapView';
 import CitySelectorModal from './components/CitySelectorModal';
 import NearbyStopsModal from './components/NearbyStopsModal';
+
+const MapView = lazy(() => import('./components/MapView'));
 import FilterPills from './components/FilterPills';
 import EmptyState from './components/EmptyState';
 import { LineListSkeleton } from './components/Skeleton';
@@ -144,6 +145,12 @@ export default function App() {
 
   // Alerta de descida: as coordenadas das paradas vêm do endpoint de rastreamento
   const [alight, setAlight] = useState(null);
+  const [uiNotice, setUiNotice] = useState(null);
+
+  const showNotice = (msg) => {
+    setUiNotice(msg);
+    setTimeout(() => setUiNotice(null), 4000);
+  };
 
   const handleStartAlight = async ({ line, serviceId, stop }) => {
     try {
@@ -153,12 +160,12 @@ export default function App() {
       const json = await res.json();
       const located = json.data?.stops?.find(s => s.stopId === stop.stopId);
       if (typeof located?.lat !== 'number' || typeof located?.lng !== 'number') {
-        alert('Ainda não temos a localização exata deste ponto. Tente outro ponto da linha.');
+        showNotice('Ainda não temos a localização exata deste ponto. Tente outro ponto da linha.');
         return;
       }
       setAlight({ line, stop: { stopId: stop.stopId, name: stop.name, lat: located.lat, lng: located.lng } });
     } catch {
-      alert('Não foi possível ativar o aviso agora. Verifique sua conexão.');
+      showNotice('Não foi possível ativar o aviso agora. Verifique sua conexão.');
     }
   };
 
@@ -299,7 +306,6 @@ export default function App() {
         showOnlyFavorites={showOnlyFavorites}
         onToggleOnlyFavorites={() => setActiveFilter(prev => (prev === 'favorites' ? 'all' : 'favorites'))}
         favoritesCount={favorites.length}
-        totalLinesCount={lines.length}
         installPrompt={installPrompt}
         onInstallPWA={handleInstallPWA}
         onOpenNearbyStops={() => setIsNearbyModalOpen(true)}
@@ -326,24 +332,24 @@ export default function App() {
 
         {/* Hero (primeiro uso, ainda sem pontos salvos) */}
         {!hasSearch && activeFilter === 'all' && savedStops.length === 0 && (
-          <section className="relative overflow-hidden rounded-[28px] bg-[#0e1116] text-white dark:bg-surface dark:border dark:border-line px-5 py-6 sm:px-8 sm:py-9">
+          <section className="relative overflow-hidden rounded-[28px] bg-hero text-on-hero dark:border dark:border-line px-5 py-6 sm:px-8 sm:py-9">
             <div aria-hidden="true" className="absolute -right-14 -top-14 w-32 h-32 sm:-right-10 sm:-top-16 sm:w-56 sm:h-56 rounded-full bg-brand" />
             <div aria-hidden="true" className="absolute -right-6 -bottom-12 w-24 h-24 sm:right-16 sm:bottom-[-70px] sm:w-40 sm:h-40 rounded-full bg-signal" />
             <div className="relative max-w-[78%] sm:max-w-xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-on-hero/60">
                 {currentCity?.cityName || 'Sorocaba'} · {currentCity?.stateInitials || 'SP'}
               </p>
               <h2 className="mt-2 font-display text-[28px] sm:text-[40px] font-bold leading-[1.05]">
                 Pra onde você vai <span className="text-brand">agora?</span>
               </h2>
-              <p className="mt-3 text-sm text-white/70">
+              <p className="mt-3 text-sm text-on-hero/70">
                 {loadingLines
                   ? 'Carregando linhas da cidade...'
                   : `${lines.length} linhas com ônibus em tempo real. Sem anúncios, sempre.`}
               </p>
-              <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/85">
+              <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-on-hero/10 px-3 py-1.5 text-xs font-medium text-on-hero/85">
                 <Bookmark className="w-3.5 h-3.5 flex-shrink-0 text-brand" />
-                <span>Abra uma linha e toque em <strong className="text-white">Salvar ponto</strong></span>
+                <span>Abra uma linha e toque em <strong className="text-on-hero">Salvar ponto</strong></span>
               </p>
             </div>
           </section>
@@ -464,18 +470,30 @@ export default function App() {
       {/* Visualizador de Mapa Interativo (Leaflet) com Rastreador de Ônibus em Tempo Real */}
       {/* Vindo de link compartilhado, espera o catálogo para mostrar o nome da linha */}
       {mapData && !(mapData.followVehicleId && loadingLines) && (
-        <MapView
-          line={lines.find(l => l.lineRoutesPath === mapData.line.lineRoutesPath) || mapData.line}
-          details={mapData.details}
-          selectedStop={mapData.selectedStop}
-          cityId={currentCity?.cityId || 35}
-          followVehicleId={mapData.followVehicleId}
-          onClose={() => setMapData(null)}
-        />
+        <Suspense fallback={null}>
+          <MapView
+            line={lines.find(l => l.lineRoutesPath === mapData.line.lineRoutesPath) || mapData.line}
+            details={mapData.details}
+            selectedStop={mapData.selectedStop}
+            cityId={currentCity?.cityId || 35}
+            followVehicleId={mapData.followVehicleId}
+            onClose={() => setMapData(null)}
+          />
+        </Suspense>
       )}
 
       {/* Aviso de descida (acompanha o GPS mesmo com o drawer fechado) */}
       {alight && <AlightAlert target={alight} onCancel={() => setAlight(null)} />}
+
+      {/* Aviso rápido não bloqueante */}
+      {uiNotice && (
+        <div
+          role="status"
+          className="fixed z-[70] left-4 right-4 top-safe-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:max-w-md rounded-full bg-hero text-on-hero border border-line px-4 py-2.5 text-xs font-semibold shadow-lift text-center animate-fade-in"
+        >
+          {uiNotice}
+        </div>
+      )}
 
       {/* Planejador de rota A -> B */}
       <TripPlannerModal

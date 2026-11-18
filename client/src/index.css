@@ -13,6 +13,8 @@
     --nx-surface: #ffffff;
     --nx-surface-2: #eef0e8;
     --nx-surface-3: #e3e6da;
+    --nx-hero: #0e1116;
+    --nx-on-hero: #ffffff;
     --nx-line: #dcdfd4;
     --nx-line-strong: #c2c6b8;
     --nx-scrim: rgb(8 10 14 / 0.55);
@@ -59,6 +61,8 @@
       --nx-surface: #161a21;
       --nx-surface-2: #1d222b;
       --nx-surface-3: #262c37;
+      --nx-hero: #161a21;
+      --nx-on-hero: #f1f3ec;
       --nx-line: #2a303b;
       --nx-line-strong: #3b4351;
       --nx-scrim: rgb(0 0 0 / 0.65);

@@ -10,19 +10,25 @@ const TONE_CLASS = {
 
 // Selo "costuma atrasar X min" da linha numa parada; some quando não há histórico suficiente
 export default function ReliabilityBadge({ serviceId, stopId, short = false, className = '' }) {
-  const [data, setData] = useState(null);
+  const pairKey = serviceId && stopId ? `${serviceId}:${stopId}` : '';
+  const [entry, setEntry] = useState({ key: '', data: null });
 
   useEffect(() => {
     if (!serviceId || !stopId) return undefined;
     let cancelled = false;
-    setData(null);
+    const currentKey = `${serviceId}:${stopId}`;
     fetch(apiUrl(`/api/reliability?serviceId=${encodeURIComponent(serviceId)}&stopId=${encodeURIComponent(stopId)}`))
       .then(r => r.json())
-      .then(j => { if (!cancelled && j.success) setData(j.data); })
+      .then(j => {
+        if (!cancelled && j.success) {
+          setEntry({ key: currentKey, data: j.data });
+        }
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [serviceId, stopId]);
 
+  const data = entry.key === pairKey ? entry.data : null;
   const badge = reliabilityBadge(data, { short });
   if (!badge) return null;
 

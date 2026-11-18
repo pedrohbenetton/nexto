@@ -44,7 +44,10 @@ export default function LineDetailDrawer({
 
   const initialSelectionRef = useRef({ stopId: initialStopId, stopName: initialStopName });
   const onDetailsCachedRef = useRef(onDetailsCached);
-  onDetailsCachedRef.current = onDetailsCached;
+
+  useEffect(() => {
+    onDetailsCachedRef.current = onDetailsCached;
+  }, [onDetailsCached]);
 
   // 1. Carregar linhas pareadas (outros sentidos da mesma rota)
   useEffect(() => {

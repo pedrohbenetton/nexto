@@ -10,6 +10,8 @@
   --color-surface: var(--nx-surface);
   --color-surface-2: var(--nx-surface-2);
   --color-surface-3: var(--nx-surface-3);
+  --color-hero: var(--nx-hero);
+  --color-on-hero: var(--nx-on-hero);
   --color-line: var(--nx-line);
   --color-line-strong: var(--nx-line-strong);
   --color-scrim: var(--nx-scrim);
