@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiUrl } from '../utils/api';
 import { getCurrentPosition } from '../utils/geolocation';
+import { useEscapeKey } from '../utils/useEscapeKey';
 import LinePlate from './LinePlate';
 import L from 'leaflet';
-import { 
-  X, RefreshCw, Radio, Navigation, Eye, MapPin, Bus, 
-  Crosshair, Footprints, Users, ArrowLeftRight
+import {
+  X, RefreshCw, Radio, Navigation, Bus,
+  Crosshair, Footprints, ArrowLeftRight
 } from 'lucide-react';
 
 // Cores do mapa: fixas (legíveis sobre tiles claros e escuros), alinhadas à marca
@@ -19,21 +20,47 @@ const MAP_COLORS = {
 
 // Cálculo de distância geodésica em metros (Haversine)
 function getDistanceMeters(lat1, lon1, lat2, lon2) {
-  const R = 6371e3; // Raio da Terra em metros
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const R = 6371e3;
+  const p1 = (lat1 * Math.PI) / 180;
+  const p2 = (lat2 * Math.PI) / 180;
+  const dp = ((lat2 - lat1) * Math.PI) / 180;
+  const dl = ((lon2 - lon1) * Math.PI) / 180;
 
   const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    Math.sin(dp / 2) * Math.sin(dp / 2) +
+    Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return Math.round(R * c);
 }
 
-export default function MapView({ line, details, selectedStop, onClose, followVehicleId }) {
+function computeClosestStopData(coords, stops) {
+  if (!coords || !stops || stops.length === 0) return null;
+
+  let closest = null;
+  let minDistance = Infinity;
+
+  stops.forEach(stop => {
+    if (typeof stop.lat === 'number' && typeof stop.lng === 'number') {
+      const dist = getDistanceMeters(coords.lat, coords.lng, stop.lat, stop.lng);
+      if (dist < minDistance) {
+        minDistance = dist;
+        closest = stop;
+      }
+    }
+  });
+
+  if (!closest) return null;
+  return {
+    stop: closest,
+    distanceMeters: minDistance,
+    walkMinutes: Math.max(1, Math.round(minDistance / 80))
+  };
+}
+
+export default function MapView({ line, details, selectedStop, cityId = 35, onClose, followVehicleId }) {
+  useEscapeKey(onClose, true);
+
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
@@ -41,58 +68,68 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
   const userLayerRef = useRef(null);
 
   const [currentLine, setCurrentLine] = useState(line);
+  const [pairedLines, setPairedLines] = useState([]);
   const [trackingData, setTrackingData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [lastSync, setLastSync] = useState(null);
   const [syncCountdown, setSyncCountdown] = useState(12);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-  // Localização do Usuário & Parada Mais Próxima
+  // Localização do Usuário
   const [userLocation, setUserLocation] = useState(null);
   const [locatingUser, setLocatingUser] = useState(false);
-  const [closestStopInfo, setClosestStopInfo] = useState(null);
+  const [gpsError, setGpsError] = useState(null);
 
-  // 1. Carregar telemetria de ônibus e paradas
-  const fetchTracking = async (showLoader = false) => {
+  const isOriginalLine = currentLine?.lineRoutesPath === line?.lineRoutesPath;
+  const activeServiceId = isOriginalLine ? (details?.serviceId || '') : '';
+
+  const closestStopInfo = userLocation && trackingData?.stops
+    ? computeClosestStopData(userLocation, trackingData.stops)
+    : null;
+
+  // Buscar sentidos pareados da linha para permitir inverter direto no mapa
+  useEffect(() => {
+    let active = true;
+    if (!currentLine?.routeCode) return undefined;
+    fetch(apiUrl(`/api/lines/paired?routeCode=${encodeURIComponent(currentLine.routeCode)}&cityId=${cityId}`))
+      .then(r => r.json())
+      .then(j => {
+        if (active && j.success && Array.isArray(j.data)) setPairedLines(j.data);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [currentLine?.routeCode, cityId]);
+
+  const fetchTracking = useCallback(async (showLoader = false) => {
     if (!currentLine?.lineRoutesPath) return;
     if (showLoader) setLoading(true);
     try {
-      const res = await fetch(apiUrl(`/api/lines/tracking?path=${encodeURIComponent(currentLine.lineRoutesPath)}&serviceId=${details?.serviceId || ''}`));
+      const res = await fetch(apiUrl(
+        `/api/lines/tracking?path=${encodeURIComponent(currentLine.lineRoutesPath)}&serviceId=${encodeURIComponent(activeServiceId)}&cityId=${cityId}`
+      ));
       const json = await res.json();
       if (json.success && json.data) {
         setTrackingData(json.data);
-        setLastSync(new Date());
         setSyncCountdown(12);
-
-        // Se o usuário tem localização ativa, recalcula parada mais próxima
-        if (userLocation && json.data.stops) {
-          computeClosestStop(userLocation, json.data.stops);
-        }
       }
     } catch (err) {
-      console.error('Falha na telemetria de veículos:', err);
+      console.error('Falha ao atualizar mapa da linha:', err);
     } finally {
       if (showLoader) setLoading(false);
     }
-  };
+  }, [currentLine?.lineRoutesPath, activeServiceId, cityId]);
 
-  // 2. Inicialização do Mapa Leaflet
+  // Inicialização do Mapa Leaflet
   useEffect(() => {
-    if (!mapContainerRef.current) return;
-
-    const initialCoords = [-23.5015, -47.4526];
+    if (!mapContainerRef.current) return undefined;
 
     const map = L.map(mapContainerRef.current, {
-      center: initialCoords,
+      center: [-23.5015, -47.4526],
       zoom: 13,
       zoomControl: false
     });
     mapInstanceRef.current = map;
 
-    // Zoom no canto inferior direito
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-    // Tiles OSM (sem chave). No tema escuro, index.css inverte só os tiles.
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19
@@ -107,9 +144,9 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
     return () => {
       map.remove();
     };
-  }, [currentLine]);
+  }, [fetchTracking]);
 
-  // 3. Countdown de sincronização
+  // Countdown de sincronização a cada 12s
   useEffect(() => {
     const timer = setInterval(() => {
       setSyncCountdown(prev => {
@@ -121,38 +158,12 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [currentLine, userLocation]);
+  }, [fetchTracking]);
 
-  // 4. Calcular parada mais próxima
-  const computeClosestStop = (coords, stops) => {
-    if (!coords || !stops || stops.length === 0) return;
-
-    let closest = null;
-    let minDistance = Infinity;
-
-    stops.forEach(stop => {
-      if (typeof stop.lat === 'number' && typeof stop.lng === 'number') {
-        const dist = getDistanceMeters(coords.lat, coords.lng, stop.lat, stop.lng);
-        if (dist < minDistance) {
-          minDistance = dist;
-          closest = stop;
-        }
-      }
-    });
-
-    if (closest) {
-      const walkMinutes = Math.max(1, Math.round(minDistance / 80));
-      setClosestStopInfo({
-        stop: closest,
-        distanceMeters: minDistance,
-        walkMinutes
-      });
-    }
-  };
-
-  // 5. Geolocalização do Usuário
+  // Geolocalização do Usuário
   const handleLocateUser = () => {
     setLocatingUser(true);
+    setGpsError(null);
     getCurrentPosition().then(
       ({ lat, lng }) => {
         setLocatingUser(false);
@@ -180,29 +191,24 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
             .addTo(userLayerRef.current)
             .bindPopup(`
               <div style="font-family: var(--font-sans); color: var(--nx-ink);">
-                <p style="font-weight: 700; margin: 0 0 2px 0;">📍 Sua Localização</p>
-                <p style="font-size: 11px; color: var(--nx-muted); margin: 0;">GPS ativo com alta precisão</p>
+                <p style="font-weight: 700; margin: 0 0 2px 0;">📍 Sua localização</p>
+                <p style="font-size: 11px; color: var(--nx-muted); margin: 0;">Posição atual pelo GPS</p>
               </div>
             `);
 
           mapInstanceRef.current.flyTo([coords.lat, coords.lng], 15, { duration: 1.2 });
         }
-
-        if (trackingData?.stops) {
-          computeClosestStop(coords, trackingData.stops);
-        }
       },
       (err) => {
         setLocatingUser(false);
-        console.warn('Erro ao obter GPS do usuário:', err);
-        alert(err.code === 'UNSUPPORTED'
+        setGpsError(err?.code === 'UNSUPPORTED'
           ? 'Geolocalização não suportada neste dispositivo.'
-          : 'Não foi possível obter sua localização. Verifique as permissões de GPS.');
+          : 'Permissão de localização negada ou GPS indisponível.');
       }
     );
   };
 
-  // 6. Renderizar Traçado OSRM, Paradas e Ônibus ao Vivo
+  // Renderizar Traçado OSRM, Paradas e Ônibus ao Vivo
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !trackingData) return;
@@ -212,7 +218,6 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
 
     const bounds = L.latLngBounds();
 
-    // A. Traçado OSRM: lime da marca com contorno escuro (lê bem em tiles claros e escuros)
     if (trackingData.polyline && trackingData.polyline.length > 1) {
       L.polyline(trackingData.polyline, {
         color: MAP_COLORS.casing,
@@ -233,16 +238,15 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
       bounds.extend(linePath.getBounds());
     }
 
-    // B. Paradas da Linha
     if (trackingData.stops) {
       trackingData.stops.forEach((stop, idx) => {
-        const isTarget = selectedStop && selectedStop.stopId === stop.stopId;
+        const isTarget = isOriginalLine && selectedStop && selectedStop.stopId === stop.stopId;
         const isClosestToUser = closestStopInfo?.stop?.stopId === stop.stopId;
-        
+
         const stopHtml = `
           <div style="
-            width: ${isClosestToUser ? '16px' : isTarget ? '16px' : '10px'};
-            height: ${isClosestToUser ? '16px' : isTarget ? '16px' : '10px'};
+            width: ${isClosestToUser || isTarget ? '16px' : '10px'};
+            height: ${isClosestToUser || isTarget ? '16px' : '10px'};
             background: ${isClosestToUser ? MAP_COLORS.user : isTarget ? MAP_COLORS.route : MAP_COLORS.paper};
             border: ${isTarget ? '3px' : '2px'} solid ${isClosestToUser ? MAP_COLORS.paper : MAP_COLORS.ink};
             border-radius: 50%;
@@ -264,16 +268,15 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
           <div style="font-family: var(--font-sans); color: var(--nx-ink); min-width: 190px;">
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--nx-line); padding-bottom: 4px; margin-bottom: 6px;">
               <span style="color: ${isClosestToUser ? 'var(--nx-accent)' : 'var(--nx-ink)'}; font-weight: 700; font-size: 11px;">
-                ${isClosestToUser ? '📍 SUA PARADA MAIS PRÓXIMA' : `PARADA #${idx + 1}`}
+                ${isClosestToUser ? '📍 PARADA MAIS PRÓXIMA' : `PARADA #${idx + 1}`}
               </span>
-              <span style="color: var(--nx-faint); font-size: 10px;">${stop.stopId ? stop.stopId.slice(0, 8) : ''}</span>
             </div>
             <p style="font-size: 12px; margin: 0 0 6px 0; color: var(--nx-ink); font-weight: 600;">
               ${stop.name}
             </p>
             <div style="font-size: 11px; color: var(--nx-muted);">
               Partidas hoje: <strong style="color: var(--nx-ink);">${stop.departures?.length || 0}</strong>
-              ${isClosestToUser ? ` • <span style="color: var(--nx-accent); font-weight: 700;">${closestStopInfo.distanceMeters}m a pé</span>` : ''}
+              ${isClosestToUser ? ` • <span style="color: var(--nx-accent); font-weight: 700;">${closestStopInfo.distanceMeters} m a pé</span>` : ''}
             </div>
           </div>
         `);
@@ -282,7 +285,6 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
       });
     }
 
-    // C. ÔNIBUS AO VIVO COM BALIZAS DE RADAR
     if (trackingData.vehicles && trackingData.vehicles.length > 0) {
       trackingData.vehicles.forEach(v => {
         const isApproaching = v.status === 'APPROACHING';
@@ -333,22 +335,22 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--nx-line); padding-bottom: 5px; margin-bottom: 8px;">
               <span style="color: var(--nx-ink); font-weight: 800; font-size: 13px;">Ônibus #${v.vehicleId}</span>
               <span style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 9999px; background: ${v.isRealTime ? 'var(--nx-brand-soft)' : 'var(--nx-surface-2)'}; color: ${v.isRealTime ? 'var(--nx-accent)' : 'var(--nx-muted)'};">
-                ${v.isRealTime ? 'GPS ATIVO' : 'HORÁRIO ESTIMADO'}
+                ${v.isRealTime ? 'AO VIVO' : 'ESTIMADO'}
               </span>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr; gap: 4px; font-size: 12px; margin-bottom: 8px;">
+            <div style="display: grid; grid-template-columns: 1fr; gap: 4px; font-size: 12px; margin-bottom: 4px;">
               <div>
-                <span style="color: var(--nx-muted);">Status: </span>
-                <strong style="color: var(--nx-ink);">${isApproaching ? 'Em Aproximação' : 'Em Trânsito'}</strong>
+                <span style="color: var(--nx-muted);">Situação: </span>
+                <strong style="color: var(--nx-ink);">${isApproaching ? 'Chegando ao ponto' : 'Em circulação'}</strong>
               </div>
               <div>
-                <span style="color: var(--nx-muted);">Previsão de Chegada: </span>
-                <strong style="color: var(--nx-accent);">${v.minutesUntilArrival} min (${v.secondsUntilArrival}s)</strong>
+                <span style="color: var(--nx-muted);">Chegada: </span>
+                <strong style="color: var(--nx-accent);">${v.minutesUntilArrival} min</strong>
               </div>
               <div>
-                <span style="color: var(--nx-muted);">Próxima Parada: </span>
-                <span style="color: var(--nx-ink); font-weight: 500;">${v.nextStopName ? v.nextStopName.slice(0, 35) + '...' : 'Em rota'}</span>
+                <span style="color: var(--nx-muted);">Próximo ponto: </span>
+                <span style="color: var(--nx-ink); font-weight: 500;">${v.nextStopName ? v.nextStopName.slice(0, 42) : 'Em rota'}</span>
               </div>
             </div>
           </div>
@@ -361,123 +363,175 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
     if (bounds.isValid()) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
     }
-  }, [trackingData, selectedStop, closestStopInfo]);
+  }, [trackingData, selectedStop, closestStopInfo, isOriginalLine]);
 
-  // 6.5. Link de viagem compartilhada: segue o ônibus a cada atualização de telemetria
+  // Link de viagem compartilhada: segue o ônibus a cada atualização
   const followed = followVehicleId
     ? trackingData?.vehicles?.find(v => String(v.vehicleId) === String(followVehicleId))
     : null;
+  const followedLat = followed?.lat;
+  const followedLng = followed?.lng;
 
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || !followed) return;
-    setSelectedVehicle(followed);
-    map.setView([followed.lat, followed.lng], Math.max(map.getZoom(), 15), { animate: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followed?.lat, followed?.lng]);
+    if (!map || typeof followedLat !== 'number' || typeof followedLng !== 'number') return;
+    map.setView([followedLat, followedLng], Math.max(map.getZoom(), 15), { animate: true });
+  }, [followedLat, followedLng]);
 
-  // 7. Centralizar câmera em um veículo específico
+  const activeVehicle = selectedVehicle || followed;
+
   const focusOnVehicle = (v) => {
     if (!mapInstanceRef.current) return;
     setSelectedVehicle(v);
     mapInstanceRef.current.flyTo([v.lat, v.lng], 16, { duration: 1.2 });
   };
 
-  // Helper para limpar nome de parada
+  const switchDirection = () => {
+    if (pairedLines.length < 2) return;
+    const idx = pairedLines.findIndex(pl => pl.lineRoutesPath === currentLine?.lineRoutesPath);
+    const next = pairedLines[(idx + 1) % pairedLines.length];
+    if (next) {
+      setSelectedVehicle(null);
+      setCurrentLine(next);
+    }
+  };
+
   const formatStopTargetName = (rawName) => {
     if (!rawName) return 'Em rota';
-    if (rawName.includes('Leopoldo')) return 'Terminal Centro (R. Leopoldo Machado)';
-    if (rawName.includes('Pannunzio')) return 'Av. Dr. Armando Pannunzio';
-    if (rawName.includes('Carneiro')) return 'Av. General Carneiro';
-    if (rawName.includes('Kubitscheck')) return 'Av. Pres. Juscelino K.';
-    if (rawName.includes('Moreira')) return 'Av. Moreira César';
-    if (rawName.includes('Unnamed')) return currentLine?.routeMnemonic ? `${currentLine.routeMnemonic} (Terminal)` : 'Terminal de Linha';
+    if (rawName.includes('Unnamed')) return currentLine?.routeMnemonic ? `${currentLine.routeMnemonic} (Terminal)` : 'Terminal';
     return rawName.split(',')[0].replace(/--.*$/, '').trim();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-canvas text-ink animate-fade-in">
-      
-      {/* Top Telemetry Header (À Esquerda) */}
-      <div className="absolute top-safe-4 left-4 z-[2000] pointer-events-none">
-        <div className="pointer-events-auto bg-surface/95 backdrop-blur-md border border-line rounded-[20px] p-3 shadow-lift flex items-center gap-3">
+
+      {/* Cabeçalho da linha (à esquerda) */}
+      <div className="absolute top-safe-4 left-4 right-4 sm:right-auto z-[2000] pointer-events-none max-w-md">
+        <div className="pointer-events-auto bg-surface/95 backdrop-blur-md border border-line rounded-[20px] p-3 flex items-center gap-3">
           <LinePlate line={currentLine || {}} />
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-sm sm:text-base text-ink truncate max-w-[160px] sm:max-w-xs">
-                {currentLine?.routeMnemonic || 'Itinerário'}
+              <h2 className="font-display font-bold text-sm sm:text-base text-ink truncate">
+                {currentLine?.serviceMnemonic || currentLine?.routeMnemonic || 'Itinerário'}
               </h2>
-              <span className="hidden sm:inline text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-soft text-accent border border-accent/20">
-                GPS AO VIVO (EM CIRCULAÇÃO)
-              </span>
             </div>
-            <p className="text-xs text-muted flex items-center gap-2 mt-0.5">
-              <span>Veículos: <strong className="text-ink">{trackingData?.vehiclesCount || 0}</strong></span>
+            <p className="text-xs text-muted flex items-center gap-2 mt-0.5 flex-wrap">
+              <span>Ônibus ativos: <strong className="text-ink">{trackingData?.vehiclesCount || 0}</strong></span>
               <span>•</span>
-              <span>Headway: <strong className="text-accent">~{trackingData?.telemetrySummary?.estimatedHeadwayMinutes || 15} min</strong></span>
+              <span>Intervalo: <strong className="text-accent">~{trackingData?.telemetrySummary?.estimatedHeadwayMinutes || 15} min</strong></span>
               <span>•</span>
               <span>Paradas: <strong className="text-ink">{trackingData?.stopsCount || 0}</strong></span>
             </p>
           </div>
+          {pairedLines.length > 1 && (
+            <button
+              type="button"
+              onClick={switchDirection}
+              title="Inverter sentido da linha"
+              aria-label="Inverter sentido da linha"
+              className="h-9 px-2.5 rounded-full border border-line hover:border-line-strong bg-canvas text-xs font-semibold text-ink flex items-center gap-1 flex-shrink-0 transition-colors"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5 text-accent" />
+              <span className="hidden sm:inline">Sentido</span>
+            </button>
+          )}
         </div>
 
-        {/* Notificação de Parada Mais Próxima a Pé */}
         {closestStopInfo && (
-          <div className="pointer-events-auto mt-2 p-2.5 rounded-[12px] bg-brand-soft/95 backdrop-blur-md border border-accent/40 shadow-soft text-xs text-accent flex items-center gap-2">
-            <Footprints className="w-4 h-4 text-accent flex-shrink-0 animate-pulse" />
+          <div className="pointer-events-auto mt-2 p-2.5 rounded-[14px] bg-brand-soft/95 backdrop-blur-md border border-accent/40 text-xs text-accent flex items-center gap-2">
+            <Footprints className="w-4 h-4 text-accent flex-shrink-0" />
             <span>
-              Você está a <strong>{closestStopInfo.distanceMeters}m</strong> ({closestStopInfo.walkMinutes} min) da parada: <strong className="text-ink">{closestStopInfo.stop.name.split(',')[0]}</strong>
+              Parada mais próxima a <strong>{closestStopInfo.distanceMeters} m</strong> (~{closestStopInfo.walkMinutes} min): <strong className="text-ink">{closestStopInfo.stop.name.split(',')[0]}</strong>
             </span>
+          </div>
+        )}
+
+        {gpsError && (
+          <div className="pointer-events-auto mt-2 p-2.5 rounded-[14px] bg-danger-soft border border-danger/30 text-xs text-danger">
+            {gpsError}
           </div>
         )}
       </div>
 
-      {/* Top Right Controls (Isolados e sem colisão com o zoom do mapa) */}
-      <div className="absolute top-safe-4 right-4 z-[2000] flex items-center gap-2 pointer-events-auto">
-        {/* Botão de Localização do Usuário */}
+      {/* Controles no topo à direita */}
+      <div className="absolute top-safe-4 right-4 z-[2000] hidden sm:flex items-center gap-2 pointer-events-auto">
         <button
+          type="button"
           onClick={handleLocateUser}
           disabled={locatingUser}
-          className={`px-3.5 py-2.5 rounded-[12px] border text-xs flex items-center gap-1.5 shadow-sm transition-all ${
+          className={`h-10 px-3.5 rounded-full border text-xs flex items-center gap-1.5 transition-colors ${
             userLocation
               ? 'bg-brand-soft border-accent text-accent font-bold'
-              : 'bg-surface hover:bg-surface-2 border-line text-ink'
+              : 'bg-surface hover:bg-surface-2 border-line text-ink font-semibold'
           }`}
-          title="Detectar minha localização e achar parada mais próxima"
+          title="Mostrar minha posição e parada mais próxima"
         >
           <Crosshair className={`w-4 h-4 ${locatingUser ? 'animate-spin text-accent' : ''}`} />
-          <span className="hidden sm:inline font-semibold">MEU GPS</span>
+          <span>Meu local</span>
         </button>
 
-        {/* Botão de Sincronização */}
         <button
+          type="button"
           onClick={() => fetchTracking(true)}
           disabled={loading}
-          className="px-3.5 py-2.5 rounded-[12px] bg-surface hover:bg-surface-2 border border-line text-ink transition-all flex items-center gap-1.5 text-xs shadow-sm font-medium"
-          title="Atualizar telemetria"
+          className="h-10 px-3.5 rounded-full bg-surface hover:bg-surface-2 border border-line text-ink transition-colors flex items-center gap-1.5 text-xs font-semibold"
+          title="Atualizar mapa agora"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-accent' : 'text-muted'}`} />
-          <span className="text-xs text-accent font-bold">{syncCountdown}s</span>
+          <span className="text-accent font-bold">{syncCountdown}s</span>
         </button>
 
-        {/* Botão Fechar (Dark CTA Calendly Style) */}
         <button
+          type="button"
           onClick={onClose}
-          className="px-3.5 py-2.5 rounded-[12px] bg-ink hover:opacity-90 text-canvas transition-all shadow-sm flex items-center gap-1.5 text-xs font-semibold active:scale-95 cursor-pointer"
+          className="h-10 px-3.5 rounded-full bg-ink hover:opacity-90 text-canvas transition-opacity flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
           title="Fechar mapa"
           aria-label="Fechar mapa"
         >
           <X className="w-4 h-4" />
-          <span className="hidden sm:inline">Fechar</span>
+          <span>Fechar</span>
         </button>
       </div>
 
       {/* Container Leaflet */}
       <div ref={mapContainerRef} className="w-full h-full" />
 
-      {/* Floating Bottom Telemetry Dock */}
+      {/* Barra flutuante inferior */}
       <div className="absolute bottom-safe-4 left-4 right-4 md:left-4 md:right-auto md:w-96 z-[2000] pointer-events-none">
-        <div className="pointer-events-auto bg-surface/95 backdrop-blur-md border border-line rounded-[20px] p-3.5 shadow-lift space-y-2.5">
+        {/* Ações rápidas no mobile (acima do dock) */}
+        <div className="flex sm:hidden items-center justify-end gap-2 mb-2 pointer-events-auto">
+          <button
+            type="button"
+            onClick={handleLocateUser}
+            disabled={locatingUser}
+            aria-label="Minha localização"
+            className="h-10 px-3 rounded-full bg-surface/95 border border-line text-xs font-semibold text-ink flex items-center gap-1.5"
+          >
+            <Crosshair className={`w-4 h-4 ${locatingUser ? 'animate-spin text-accent' : 'text-accent'}`} />
+            <span>GPS</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => fetchTracking(true)}
+            disabled={loading}
+            aria-label="Atualizar mapa"
+            className="h-10 px-3 rounded-full bg-surface/95 border border-line text-xs font-bold text-accent flex items-center gap-1.5"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>{syncCountdown}s</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar mapa"
+            className="h-10 px-3.5 rounded-full bg-ink text-canvas text-xs font-semibold flex items-center gap-1.5"
+          >
+            <X className="w-4 h-4" />
+            <span>Fechar</span>
+          </button>
+        </div>
+
+        <div className="pointer-events-auto bg-surface/95 backdrop-blur-md border border-line rounded-[20px] p-3.5 space-y-2.5">
           {followVehicleId && trackingData && (
             <div className={`rounded-[12px] px-3 py-2 text-xs font-semibold flex items-center gap-2 ${
               followed ? 'bg-brand text-on-brand' : 'bg-warn-soft text-warn'
@@ -492,46 +546,46 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
           <div className="flex items-center justify-between border-b border-line pb-2 text-xs">
             <span className="text-accent font-bold flex items-center gap-1.5">
               <Radio className="w-3.5 h-3.5 animate-pulse text-accent" />
-              <span>FROTA NA ROTA ({trackingData?.vehiclesCount || 0})</span>
+              <span>Ônibus em circulação ({trackingData?.vehiclesCount || 0})</span>
             </span>
             <span className="text-[11px] text-muted">
-              Atualização em: {syncCountdown}s
+              Atualiza em {syncCountdown}s
             </span>
           </div>
 
-          {/* Lista de Ônibus Rastreados */}
-          <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 divide-y divide-surface-2">
+          <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
             {trackingData?.vehicles && trackingData.vehicles.length > 0 ? (
               trackingData.vehicles.map((v, i) => (
-                <div
+                <button
                   key={v.vehicleId || i}
+                  type="button"
                   onClick={() => focusOnVehicle(v)}
-                  className={`pt-1.5 first:pt-0 p-2.5 rounded-[12px] cursor-pointer transition-all flex items-center justify-between text-xs ${
-                    selectedVehicle?.vehicleId === v.vehicleId 
-                      ? 'bg-brand-soft border border-accent/50' 
+                  className={`w-full text-left p-2.5 rounded-[12px] transition-colors flex items-center justify-between text-xs ${
+                    activeVehicle?.vehicleId === v.vehicleId
+                      ? 'bg-brand-soft border border-accent/50'
                       : 'hover:bg-surface-2 border border-transparent'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-[12px] bg-surface-2 border border-line flex items-center justify-center text-accent font-bold text-xs">
-                      <Bus className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-[10px] bg-surface-2 border border-line flex items-center justify-center text-accent font-bold text-xs flex-shrink-0">
+                      <Bus className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-ink text-xs">Ônibus #{v.vehicleId}</span>
                         {v.isRealTime && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-brand-soft text-accent font-bold">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-brand-soft text-accent font-bold">
                             GPS
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-muted truncate max-w-[170px]">
-                        Destino: {formatStopTargetName(v.nextStopName)}
+                      <p className="text-[11px] text-muted truncate">
+                        Próximo: {formatStopTargetName(v.nextStopName)}
                       </p>
                     </div>
                   </div>
 
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-right flex-shrink-0 ml-2">
                     <span className={`text-xs font-bold ${v.secondsUntilArrival <= 60 ? 'text-accent animate-pulse' : 'text-ink'}`}>
                       {v.secondsUntilArrival <= 60 ? 'Chegando' : `${v.minutesUntilArrival} min`}
                     </span>
@@ -539,21 +593,14 @@ export default function MapView({ line, details, selectedStop, onClose, followVe
                       {v.secondsUntilArrival}s
                     </p>
                   </div>
-                </div>
+                </button>
               ))
             ) : (
               <p className="py-3 text-center text-muted text-xs">
-                Nenhum veículo transmitindo sinal no momento.
+                Nenhum ônibus com GPS ativo nesta linha agora.
               </p>
             )}
           </div>
-
-          {/* Rodapé do Dock */}
-          <div className="flex items-center justify-between text-[11px] text-muted border-t border-line pt-2">
-            <span>Clique no ônibus para centralizar</span>
-            <span className="text-accent font-semibold">Nexto</span>
-          </div>
-
         </div>
       </div>
 

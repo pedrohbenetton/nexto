@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { apiUrl } from '../utils/api';
 import { getCurrentPosition } from '../utils/geolocation';
 import { tapFeedback } from '../utils/haptics';
+import { useEscapeKey } from '../utils/useEscapeKey';
 import {
   buildNearbyStopsPath,
   formatDistance,
@@ -24,6 +25,7 @@ export default function NearbyStopsModal({
   onSelectLineStop,
   onSelectStop
 }) {
+  useEscapeKey(onClose, isOpen);
   const [stops, setStops] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

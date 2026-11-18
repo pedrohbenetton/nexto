@@ -308,6 +308,15 @@ describe('/api/crowding', () => {
     const { body } = await json(api.get('/crowding/nao-existe'));
     assert.equal(body.data.level, 'unknown');
   });
+
+  test('consulta em lote via GET /crowding?ids= retorna mapa por veículo e 400 sem ids', async () => {
+    assert.equal((await api.get('/crowding')).status, 400);
+    await api.post('/crowding/report', { vehicleId: 'b-1', level: 'low' });
+    const { status, body } = await json(api.get('/crowding?ids=b-1,b-inexistente'));
+    assert.equal(status, 200);
+    assert.equal(body.data['b-1'].level, 'low');
+    assert.equal(body.data['b-inexistente'].level, 'unknown');
+  });
 });
 
 describe('/api/issues', () => {

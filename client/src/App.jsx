@@ -468,6 +468,7 @@ export default function App() {
           line={lines.find(l => l.lineRoutesPath === mapData.line.lineRoutesPath) || mapData.line}
           details={mapData.details}
           selectedStop={mapData.selectedStop}
+          cityId={currentCity?.cityId || 35}
           followVehicleId={mapData.followVehicleId}
           onClose={() => setMapData(null)}
         />

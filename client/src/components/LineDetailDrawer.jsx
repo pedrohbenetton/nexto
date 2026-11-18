@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiUrl } from '../utils/api';
-import { 
-  X, Radio, Clock, MapPin, RefreshCw, Bus, AlertCircle, 
-  Map, CheckCircle2, Navigation, Activity, Bell, BellRing, 
-  ArrowLeftRight, Users, Sparkles, Bookmark, Share2
+import { useEscapeKey } from '../utils/useEscapeKey';
+import {
+  X, Clock, RefreshCw, AlertCircle,
+  Map, CheckCircle2, Navigation, Activity, Bell, BellRing,
+  ArrowLeftRight, Bookmark, Share2
 } from 'lucide-react';
 import { PUBLIC_WEB_URL, buildShareUrl, buildShareMessage, shareTrip } from '../utils/shareTrip';
 import { findInitialStop } from '../utils/tripPlanCore';
@@ -21,6 +22,8 @@ export default function LineDetailDrawer({
   line, onClose, onOpenMap, cityId = 35, initialStopId, initialStopName, savedStops = [], onToggleSavedStop,
   onStartAlight, alightStopId, onDetailsCached
 }) {
+  useEscapeKey(onClose, true);
+
   const [activeLine, setActiveLine] = useState(line);
   const [pairedLines, setPairedLines] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +32,6 @@ export default function LineDetailDrawer({
   const [selectedStop, setSelectedStop] = useState(null);
   const [predictions, setPredictions] = useState(null);
   const [predLoading, setPredLoading] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
 
@@ -39,6 +41,10 @@ export default function LineDetailDrawer({
 
   // Lotação reportada
   const [crowdingData, setCrowdingData] = useState({});
+
+  const initialSelectionRef = useRef({ stopId: initialStopId, stopName: initialStopName });
+  const onDetailsCachedRef = useRef(onDetailsCached);
+  onDetailsCachedRef.current = onDetailsCached;
 
   // 1. Carregar linhas pareadas (outros sentidos da mesma rota)
   useEffect(() => {
@@ -72,7 +78,9 @@ export default function LineDetailDrawer({
         setDetails(det);
         setOfflineMode(isOffline);
         if (det.stops && det.stops.length > 0) {
-          setSelectedStop(findInitialStop(det.stops, { stopId: initialStopId, stopName: initialStopName }));
+          const isInitialLine = activeLine.lineRoutesPath === line.lineRoutesPath;
+          const sel = isInitialLine ? initialSelectionRef.current : {};
+          setSelectedStop(findInitialStop(det.stops, sel));
         }
       };
 
@@ -83,7 +91,7 @@ export default function LineDetailDrawer({
           if (json.success && json.data) {
             applyDetails(json.data, false);
             const nextStore = saveLineDetails(activeLine.lineRoutesPath, json.data);
-            if (onDetailsCached) onDetailsCached(nextStore);
+            if (onDetailsCachedRef.current) onDetailsCachedRef.current(nextStore);
           } else {
             const cached = loadLineDetails(activeLine.lineRoutesPath);
             if (cached) applyDetails(cached, true);
@@ -102,23 +110,23 @@ export default function LineDetailDrawer({
     }
     fetchDetails();
     return () => { isMounted = false; };
-  }, [activeLine]);
+  }, [activeLine, line.lineRoutesPath]);
 
-  // 3. Carregar previsões em tempo real para a parada selecionada
-  const fetchPredictions = async (stop = selectedStop, showLoader = true) => {
-    if (!details?.serviceId || !stop?.stopId) return;
+  // 3. Carregar previsões em tempo real para a parada selecionada + lotação em lote único
+  const fetchPredictions = useCallback(async (stop, showLoader = true) => {
+    const serviceId = details?.serviceId;
+    if (!serviceId || !stop?.stopId) return;
     if (showLoader) setPredLoading(true);
     try {
-      const res = await fetch(apiUrl(`/api/predictions?serviceId=${encodeURIComponent(details.serviceId)}&stopId=${encodeURIComponent(stop.stopId)}`));
+      const res = await fetch(apiUrl(`/api/predictions?serviceId=${encodeURIComponent(serviceId)}&stopId=${encodeURIComponent(stop.stopId)}`));
       const json = await res.json();
       if (json.success && json.data) {
         setPredictions(json.data);
         setLastUpdated(new Date());
 
-        // Verificar disparo de Alarme de Proximidade
         if (alarmTarget && !alarmTriggered && json.data.vehicles) {
           const targetVehicle = json.data.vehicles.find(v => v.vehicleId === alarmTarget);
-          if (targetVehicle && targetVehicle.secondsUntilArrival <= 180) { // Menos de 3 minutos
+          if (targetVehicle && targetVehicle.secondsUntilArrival <= 180) {
             transitAlarm.triggerAlert({
               vehicleId: targetVehicle.vehicleId,
               minutes: targetVehicle.minutesUntilArrival,
@@ -129,40 +137,43 @@ export default function LineDetailDrawer({
           }
         }
 
-        // Consultar lotação dos veículos retornados
-        if (json.data.vehicles && json.data.vehicles.length > 0) {
-          json.data.vehicles.forEach(async (v) => {
-            try {
-              const cRes = await fetch(apiUrl(`/api/crowding/${v.vehicleId}`));
-              const cJson = await cRes.json();
-              if (cJson.success && cJson.data) {
-                setCrowdingData(prev => ({ ...prev, [v.vehicleId]: cJson.data }));
-              }
-            } catch (e) {}
-          });
+        const vehicleIds = (json.data.vehicles || []).map(v => v.vehicleId).filter(Boolean);
+        if (vehicleIds.length > 0) {
+          try {
+            const cRes = await fetch(apiUrl(`/api/crowding?ids=${encodeURIComponent(vehicleIds.join(','))}`));
+            const cJson = await cRes.json();
+            if (cJson.success && cJson.data) {
+              setCrowdingData(prev => ({ ...prev, ...cJson.data }));
+            }
+          } catch {
+            // Falha na consulta de lotação não interrompe as previsões
+          }
         }
       }
     } catch (err) {
-      console.error('Erro na telemetria de parada:', err);
+      console.error('Erro ao buscar previsões da parada:', err);
     } finally {
       if (showLoader) setPredLoading(false);
     }
-  };
+  }, [details?.serviceId, alarmTarget, alarmTriggered]);
 
   useEffect(() => {
-    if (details?.serviceId && selectedStop?.stopId) {
-      fetchPredictions(selectedStop, true);
-    }
-  }, [details, selectedStop]);
+    if (!details?.serviceId || !selectedStop?.stopId) return undefined;
+    let active = true;
+    (async () => {
+      if (active) await fetchPredictions(selectedStop, true);
+    })();
+    return () => { active = false; };
+  }, [details?.serviceId, selectedStop, fetchPredictions]);
 
   // 4. Polling automático a cada 12s para dados de tempo real
   useEffect(() => {
-    if (!autoRefresh || !details?.serviceId || !selectedStop?.stopId) return;
+    if (!details?.serviceId || !selectedStop?.stopId) return undefined;
     const interval = setInterval(() => {
       fetchPredictions(selectedStop, false);
     }, 12000);
     return () => clearInterval(interval);
-  }, [autoRefresh, details, selectedStop, alarmTarget, alarmTriggered]);
+  }, [details?.serviceId, selectedStop, fetchPredictions]);
 
   // Toggle do Alarme de Chegada
   const toggleAlarm = async (vehicleId) => {

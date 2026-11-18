@@ -23,9 +23,13 @@ router.get('/', (req, res) => {
       lineTracking: '/api/lines/tracking?path={lineRoutesPath}&serviceId={serviceId}&cityId={cityId}',
       linePaired: '/api/lines/paired?routeCode={code}&cityId={cityId}',
       predictions: '/api/predictions?serviceId={serviceId}&stopId={stopId}',
+      reliability: '/api/reliability?serviceId={serviceId}&stopId={stopId}',
+      trip: '/api/trip?fromLat={lat}&fromLng={lng}&toLat={lat}&toLng={lng}',
       autocomplete: '/api/autocomplete?term={termo}',
       placeResolve: '/api/places/resolve?text={termo}&key={id}',
-      stopsNearby: '/api/stops/nearby?lat={lat}&lng={lng}&radius={metros}'
+      stopsNearby: '/api/stops/nearby?lat={lat}&lng={lng}&cityId={cityId}&radius={metros}',
+      crowdingBatch: '/api/crowding?ids={v1,v2}',
+      issues: '/api/issues/{subjectId}'
     }
   });
 });
@@ -324,6 +328,18 @@ router.post('/issues/report', (req, res) => {
 
 router.get('/issues/:subjectId', (req, res) => {
   res.json({ success: true, data: crowding.getIssues(String(req.params.subjectId)) });
+});
+
+router.get('/crowding', (req, res) => {
+  const rawIds = String(req.query.ids || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, 50);
+  if (rawIds.length === 0) {
+    return res.status(400).json({ error: 'Parâmetro "ids" (separado por vírgula) obrigatório' });
+  }
+  res.json({ success: true, data: crowding.getBatchCrowding(rawIds) });
 });
 
 router.get('/crowding/:vehicleId', (req, res) => {

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { apiUrl } from '../utils/api';
 import { tapFeedback } from '../utils/haptics';
+import { useEscapeKey } from '../utils/useEscapeKey';
 import {
   buildTripPath, resolveTripTime, formatDuration, formatClock,
   summarizeItinerary, describeLeg, matchLegToCatalogLine
@@ -29,6 +30,7 @@ const SLOT_ICONS = {
 
 // Planejador de rota de A até B (com baldeação, atalhos Casa/Trabalho e abertura ao vivo da linha), via /api/trip
 export default function TripPlannerModal({ isOpen, onClose, cityName, lines = [], onOpenLineStop }) {
+  useEscapeKey(onClose, isOpen);
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
   const [activeField, setActiveField] = useState('to');
