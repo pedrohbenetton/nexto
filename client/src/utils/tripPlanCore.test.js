@@ -2,7 +2,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   shortPlaceName, needsResolve, buildTripPath, formatDuration, formatClock,
-  summarizeItinerary, describeLeg, itineraryPoints, resolveTripTime
+  summarizeItinerary, describeLeg, itineraryPoints, resolveTripTime,
+  matchLegToCatalogLine, findInitialStop
 } from './tripPlanCore.js';
 
 describe('shortPlaceName', () => {
@@ -120,5 +121,51 @@ describe('resolveTripTime', () => {
   test('horário inválido cai em "agora"', () => {
     assert.deepEqual(resolveTripTime({ mode: 'depart', clock: '99:99', now }), { dateTime: undefined, arriveBy: false });
     assert.deepEqual(resolveTripTime({ mode: 'depart', clock: '', now }), { dateTime: undefined, arriveBy: false });
+  });
+});
+
+describe('matchLegToCatalogLine', () => {
+  const catalog = [
+    { id: '1', routeCode: '80', routeMnemonic: 'UFSCAR', serviceMnemonic: 'U F S C A R - Bairro', lineRoutesPath: 'p-80-b' },
+    { id: '2', routeCode: '80', routeMnemonic: 'UFSCAR', serviceMnemonic: 'U F S C A R - Centro', lineRoutesPath: 'p-80-c' },
+    { id: '3', routeCode: 'T441', routeMnemonic: 'MT Tatiana', serviceMnemonic: '01 - Tatiana - centro', lineRoutesPath: 'p-t441-c' }
+  ];
+
+  test('casa código e sentido exato da perna de ônibus', () => {
+    const leg = { isWalk: false, lineCode: '80', headsign: 'U F S C A R - Centro', lineName: 'Ufscar' };
+    assert.equal(matchLegToCatalogLine(leg, catalog)?.lineRoutesPath, 'p-80-c');
+  });
+
+  test('normaliza barras no código da linha (T44/1 -> T441)', () => {
+    const leg = { isWalk: false, lineCode: 'T44/1', headsign: '01 - Tatiana - centro', lineName: 'Mt Tatiana' };
+    assert.equal(matchLegToCatalogLine(leg, catalog)?.lineRoutesPath, 'p-t441-c');
+  });
+
+  test('retorna null para caminhada ou linha fora do catálogo', () => {
+    assert.equal(matchLegToCatalogLine({ isWalk: true }, catalog), null);
+    assert.equal(matchLegToCatalogLine({ isWalk: false, lineCode: '999' }, catalog), null);
+  });
+});
+
+describe('findInitialStop', () => {
+  const stops = [
+    { stopId: 's-1', name: 'Rua Leopoldo Machado, 259 - Centro, Sorocaba - SP' },
+    { stopId: 's-2', name: 'Av. Dr. Armando Pannunzio, 1767 - Jardim Sao Carlos, Sorocaba - SP' },
+    { stopId: 's-3', name: 'Av. Dr. Armando Pannunzio, 1700 - Jardim Piazza Di Roma, Sorocaba - SP' }
+  ];
+
+  test('prioriza stopId exato quando informado', () => {
+    assert.equal(findInitialStop(stops, { stopId: 's-3' })?.stopId, 's-3');
+  });
+
+  test('encontra parada de embarque pelo nome e número vindo do planejador', () => {
+    const found = findInitialStop(stops, {
+      stopName: 'Av. Dr. Armando Pannunzio, 1767 - Jardim Sao Carlos, Sorocaba - SP, 18051-735, Brasil'
+    });
+    assert.equal(found?.stopId, 's-2');
+  });
+
+  test('cai na primeira parada quando nada casa', () => {
+    assert.equal(findInitialStop(stops, { stopName: 'Endereço inexistente' })?.stopId, 's-1');
   });
 });

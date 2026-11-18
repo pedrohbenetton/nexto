@@ -5,24 +5,26 @@ import { getCurrentPosition } from '../utils/geolocation';
 import { shortPlaceName, needsResolve } from '../utils/tripPlanCore';
 
 // Campo de endereço com autocomplete. Entrega { name, lat, lng } já resolvido.
-export default function PlaceInput({ label, value, onChange, placeholder, cityName }) {
-  const [text, setText] = useState(value?.name || '');
+export default function PlaceInput({ label, value, onChange, onActivate, placeholder, cityName }) {
+  const [draft, setDraft] = useState(value?.name || '');
+  const [editing, setEditing] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  const [geoError, setGeoError] = useState(null);
   const timer = useRef(null);
   const requestId = useRef(0);
 
-  // Sincroniza quando o pai troca o valor (ex.: inverter origem/destino)
-  useEffect(() => {
-    if (value) setText(value.name);
-  }, [value]);
+  // Quando o valor externo está definido, exibe value.name sem precisar de setState em efeito
+  const displayValue = editing ? draft : (value?.name ?? draft);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const handleType = (e) => {
     const term = e.target.value;
-    setText(term);
+    setEditing(true);
+    setDraft(term);
+    setGeoError(null);
     onChange(null);
     clearTimeout(timer.current);
     if (term.trim().length < 3) {
@@ -57,7 +59,8 @@ export default function PlaceInput({ label, value, onChange, placeholder, cityNa
     setOpen(false);
     setSuggestions([]);
     const name = shortPlaceName(place.nome);
-    setText(name);
+    setDraft(name);
+    setEditing(false);
     if (!needsResolve(place)) {
       onChange({ name, lat: place.lat, lng: place.lng });
       return;
@@ -78,11 +81,14 @@ export default function PlaceInput({ label, value, onChange, placeholder, cityNa
 
   const useMyLocation = async () => {
     setBusy(true);
+    setGeoError(null);
     try {
       const { lat, lng } = await getCurrentPosition();
+      setDraft('Minha localização');
+      setEditing(false);
       onChange({ name: 'Minha localização', lat, lng });
     } catch {
-      alert('Não foi possível obter sua localização. Verifique a permissão de GPS.');
+      setGeoError('Permissão de GPS negada ou sinal indisponível.');
     } finally {
       setBusy(false);
     }
@@ -94,9 +100,12 @@ export default function PlaceInput({ label, value, onChange, placeholder, cityNa
       <div className="flex items-center gap-1.5">
         <input
           type="text"
-          value={text}
+          value={displayValue}
           onChange={handleType}
-          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          onFocus={() => {
+            if (onActivate) onActivate();
+            if (suggestions.length > 0) setOpen(true);
+          }}
           placeholder={placeholder}
           className="flex-1 min-w-0 h-11 px-3.5 rounded-[14px] bg-surface-2 border border-line text-sm text-ink placeholder:text-muted focus:outline-none focus:border-brand"
         />
@@ -110,6 +119,10 @@ export default function PlaceInput({ label, value, onChange, placeholder, cityNa
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crosshair className="w-4 h-4" />}
         </button>
       </div>
+
+      {geoError && (
+        <p className="mt-1 text-xs text-danger">{geoError}</p>
+      )}
 
       {open && suggestions.length > 0 && (
         <ul className="mt-1.5 mr-12 rounded-[14px] bg-surface border border-line overflow-hidden divide-y divide-line">

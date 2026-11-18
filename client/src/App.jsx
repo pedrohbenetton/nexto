@@ -62,6 +62,7 @@ export default function App() {
   // Modais e Visualizadores
   const [selectedLine, setSelectedLine] = useState(null);
   const [selectedStopId, setSelectedStopId] = useState(null);
+  const [selectedStopName, setSelectedStopName] = useState(null);
   // Link de viagem compartilhada (?linha=...&onibus=...) abre direto no mapa seguindo o ônibus
   const [mapData, setMapData] = useState(() => {
     const trip = parseShareParams(window.location.search);
@@ -188,9 +189,10 @@ export default function App() {
   }, [currentCity]);
 
   // Registrar em Recentes ao abrir linha
-  const handleSelectLine = (line, stopId = null) => {
+  const handleSelectLine = (line, stopId = null, stopName = null) => {
     setSelectedLine(line);
     setSelectedStopId(stopId);
+    setSelectedStopName(stopName);
     setRecentLines(prev => {
       const filtered = prev.filter(l => (l.lineRoutesPath || l.id) !== (line.lineRoutesPath || line.id));
       return [line, ...filtered].slice(0, 5); // Mantém os 5 mais recentes
@@ -426,6 +428,7 @@ export default function App() {
         <LineDetailDrawer
           line={selectedLine}
           initialStopId={selectedStopId}
+          initialStopName={selectedStopName}
           savedStops={savedStops}
           onToggleSavedStop={handleToggleSavedStop}
           onStartAlight={handleStartAlight}
@@ -458,6 +461,10 @@ export default function App() {
         isOpen={isTripOpen}
         onClose={() => setIsTripOpen(false)}
         cityName={currentCity?.cityName}
+        lines={lines}
+        onOpenLineStop={(line, boardingStopName) => {
+          handleSelectLine(line, null, boardingStopName);
+        }}
       />
 
       {/* Modal de Paradas Próximas via GPS */}

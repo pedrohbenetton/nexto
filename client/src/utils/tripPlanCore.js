@@ -71,3 +71,134 @@ export function resolveTripTime({ mode, clock, now = Date.now() }) {
   if (target.getTime() <= now) target.setDate(target.getDate() + 1);
   return { dateTime: target.getTime(), arriveBy: mode === 'arrive' };
 }
+
+function normCode(s) {
+  return String(s || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+
+function normStopText(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\bav\.?\s*/g, 'avenida ')
+    .replace(/\br\.?\s*/g, 'rua ')
+    .replace(/\bpres\.?\s*/g, 'presidente ')
+    .replace(/\bgen\.?\s*|\bgal\.?\s*/g, 'general ')
+    .replace(/\bdr\.?\s*/g, 'doutor ')
+    .replace(/\bprof\.?\s*/g, 'professor ')
+    .replace(/\brod\.?\s*/g, 'rodovia ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function houseNums(s) {
+  return String(s || '').replace(/\d{5}-?\d{3}/g, '').match(/\b\d{1,5}\b/g) || [];
+}
+
+// Associa um trecho de ônibus do planejador à linha equivalente do catálogo da cidade
+export function matchLegToCatalogLine(leg, catalogLines = []) {
+  if (!leg || leg.isWalk) return null;
+  const code = normCode(leg.lineCode);
+  if (!code || !Array.isArray(catalogLines)) return null;
+
+  const candidates = catalogLines.filter(l => normCode(l.routeCode) === code);
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  const hs = normStopText(leg.headsign);
+  const ln = normStopText(leg.lineName);
+  const hsTokens = new Set(`${hs} ${ln}`.split(' ').filter(t => t.length >= 3));
+  const hsHasDir = hs.includes('centro') || hs.includes('bairro');
+
+  let best = candidates[0];
+  let bestScore = -Infinity;
+
+  for (const c of candidates) {
+    const sm = normStopText(c.serviceMnemonic);
+    const rm = normStopText(c.routeMnemonic);
+    const smHasDir = sm.includes('centro') || sm.includes('bairro');
+    let score = 0;
+
+    if (hs && sm === hs) score += 120;
+    else if (hs && sm && (sm.includes(hs) || hs.includes(sm))) score += 70;
+
+    if (hsHasDir && smHasDir) {
+      for (const dir of ['centro', 'bairro']) {
+        if (hs.includes(dir) && sm.includes(dir)) score += 45;
+        else if (hs.includes(dir) !== sm.includes(dir)) score -= 45;
+      }
+    }
+
+    for (const t of `${sm} ${rm}`.split(' ')) {
+      if (t.length >= 3 && hsTokens.has(t)) score += 12;
+    }
+
+    if ((sm.includes('garagem') || sm.includes('at2')) && !hs.includes('garagem') && !hs.includes('at2')) {
+      score -= 15;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+
+  return best;
+}
+
+// Seleciona a parada inicial no drawer por stopId exato ou pelo endereço do embarque
+export function findInitialStop(stops = [], { stopId, stopName } = {}) {
+  if (!Array.isArray(stops) || stops.length === 0) return null;
+
+  if (stopId) {
+    const byId = stops.find(s => s.stopId === stopId);
+    if (byId) return byId;
+  }
+
+  if (stopName) {
+    const cleanTarget = String(stopName)
+      .replace(/SP-079,\s*1970/i, 'Av. Dr. Armando Pannunzio, 1970')
+      .replace(/SP-079,\s*825-901/i, 'Av. Dr. Armando Pannunzio, 825-901')
+      .replace(/SP-079,\s*319/i, 'Av. Dr. Armando Pannunzio, 319')
+      .replace(/SP-079,\s*2171/i, 'Av. General Carneiro, 2171')
+      .replace(/,\s*\d{5}-?\d{3}/g, '')
+      .replace(/,\s*Brasil$/i, '')
+      .trim();
+
+    const targetNorm = normStopText(cleanTarget);
+    const head = cleanTarget.split(/\s+-\s+/)[0] || cleanTarget;
+    const targetStreet = normStopText(head.split(',')[0]);
+    const targetNums = houseNums(head);
+
+    let best = null;
+    let bestScore = 0;
+
+    for (const s of stops) {
+      const sName = String(s.name || '');
+      const sNorm = normStopText(sName);
+      if (targetNorm && sNorm === targetNorm) return s;
+
+      const sHead = sName.split(/\s+-\s+/)[0] || sName;
+      const sStreet = normStopText(sHead.split(',')[0]);
+      const sNums = houseNums(sHead);
+
+      let score = 0;
+      if (targetStreet && sStreet && (sStreet === targetStreet || sStreet.includes(targetStreet) || targetStreet.includes(sStreet))) {
+        score += 45;
+      }
+      if (targetNums.length > 0 && sNums.length > 0) {
+        if (targetNums.some(n => sNums.includes(n))) score += 60;
+        else score -= 40;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = s;
+      }
+    }
+
+    if (bestScore >= 45) return best;
+  }
+
+  return stops[0];
+}

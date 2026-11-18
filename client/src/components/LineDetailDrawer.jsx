@@ -6,6 +6,7 @@ import {
   ArrowLeftRight, Users, Sparkles, Bookmark, Share2
 } from 'lucide-react';
 import { PUBLIC_WEB_URL, buildShareUrl, buildShareMessage, shareTrip } from '../utils/shareTrip';
+import { findInitialStop } from '../utils/tripPlanCore';
 import { transitAlarm } from '../utils/audioAlert';
 import { tapFeedback } from '../utils/haptics';
 import { isStopSaved, toSavedStop } from '../utils/savedStops';
@@ -15,7 +16,7 @@ import ReliabilityBadge from './ReliabilityBadge';
 import IssueReports from './IssueReports';
 
 export default function LineDetailDrawer({
-  line, onClose, onOpenMap, cityId = 35, initialStopId, savedStops = [], onToggleSavedStop,
+  line, onClose, onOpenMap, cityId = 35, initialStopId, initialStopName, savedStops = [], onToggleSavedStop,
   onStartAlight, alightStopId
 }) {
   const [activeLine, setActiveLine] = useState(line);
@@ -69,8 +70,7 @@ export default function LineDetailDrawer({
           if (json.success && json.data) {
             setDetails(json.data);
             if (json.data.stops && json.data.stops.length > 0) {
-              const initial = initialStopId && json.data.stops.find(s => s.stopId === initialStopId);
-              setSelectedStop(initial || json.data.stops[0]);
+              setSelectedStop(findInitialStop(json.data.stops, { stopId: initialStopId, stopName: initialStopName }));
             }
           } else {
             setError('Falha ao sincronizar o itinerário da linha.');
