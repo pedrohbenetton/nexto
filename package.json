@@ -8,7 +8,10 @@
     "dev:server": "node server/index.js",
     "dev:client": "cd client && npm run dev",
     "build:client": "cd client && npm run build",
+    "lint": "npm --prefix client run lint",
     "test": "node --test \"test/**/*.test.js\"",
+    "test:client": "npm --prefix client test",
+    "test:all": "npm test && npm --prefix client test",
     "test:poc": "node scripts/poc_live_cittamobi.js",
     "test:bff": "node scripts/test_bff_server.js"
   },

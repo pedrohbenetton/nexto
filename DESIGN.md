@@ -20,6 +20,7 @@ e `client/src/index.css` (valores `--nx-*` para claro e escuro, seguindo `prefer
 | `canvas` | `#f6f7f2` | `#0e1116` | Fundo da página |
 | `surface` | `#ffffff` | `#161a21` | Cards, header, sheets |
 | `surface-2` / `surface-3` | `#eef0e8` / `#e3e6da` | `#1d222b` / `#262c37` | Preenchimentos, hover, skeleton |
+| `hero` / `on-hero` | `#0e1116` / `#ffffff` | `#161a21` / `#f1f3ec` | Hero e faixas flutuantes de alto contraste |
 | `line` / `line-strong` | `#dcdfd4` / `#c2c6b8` | `#2a303b` / `#3b4351` | Bordas (hover usa `line-strong`) |
 | `ink` / `muted` / `faint` | `#0e1116` / `#5a6170` / `#8c929e` | `#f1f3ec` / `#9ba3b1` / `#6b7382` | Texto primário, secundário, terciário |
 | `brand` / `brand-strong` / `brand-soft` | `#c6f432` / `#b2df1c` / `#eef9c8` | `#c6f432` / `#d6fb63` / `#232c0f` | Ação primária, ativo, destaque |
@@ -55,7 +56,7 @@ com borda lime quando há GPS ao vivo, usuário em azul. Tiles OSM; no escuro os
 - `LinePlate` — código da linha na cor da linha.
 - `LineCard` — placa + nome (display) + destino + favorito.
 - `FilterPills` — ativo em `brand`, inativo em `surface` com borda.
-- `BottomNav` (mobile) — Linhas · Perto · Favoritos · Cidade; ativo com pílula lime.
+- `BottomNav` (mobile) — Linhas · Perto · Rota · Favoritos · Cidade; ativo com pílula lime.
 - `EmptyState`, `Skeleton*` — usam apenas tokens.
 
 ## Layout

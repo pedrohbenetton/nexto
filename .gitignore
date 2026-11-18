@@ -17,9 +17,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# OS specific files
+# OS & Editor specific files
 .DS_Store
 Thumbs.db
+.claude/
 
 # Python cache
 __pycache__/
