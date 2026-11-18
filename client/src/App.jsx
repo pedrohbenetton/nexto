@@ -10,6 +10,8 @@ import FilterPills from './components/FilterPills';
 import EmptyState from './components/EmptyState';
 import { LineListSkeleton } from './components/Skeleton';
 import { LINE_FILTERS, lineId, filterLines, countByFilter } from './utils/lineFilters';
+import { saveCityLines, loadCityLines, loadAllLineDetails } from './utils/offlineCatalog';
+import { buildStopSearchIndex } from './utils/offlineCatalogCore';
 import { AlertCircle, History, SearchX, Star, Route, MapPinOff, Bookmark } from 'lucide-react';
 import MyStops from './components/MyStops';
 import { toggleSavedStop } from './utils/savedStops';
@@ -132,6 +134,7 @@ export default function App() {
       return [];
     }
   });
+  const [detailsStore, setDetailsStore] = useState(loadAllLineDetails);
 
   useEffect(() => {
     localStorage.setItem('nexto_saved_stops', JSON.stringify(savedStops));
@@ -172,13 +175,24 @@ export default function App() {
         if (isMounted) {
           if (data.success && data.data) {
             setLines(data.data);
+            saveCityLines(currentCity.cityId, data.data);
           } else {
-            setLinesError('Nenhum registro de linha encontrado para esta cidade.');
+            const cached = loadCityLines(currentCity.cityId);
+            if (cached) {
+              setLines(cached.lines);
+            } else {
+              setLinesError('Nenhum registro de linha encontrado para esta cidade.');
+            }
           }
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
-          setLinesError('Falha na conexão com o serviço de telemetria.');
+          const cached = loadCityLines(currentCity.cityId);
+          if (cached) {
+            setLines(cached.lines);
+          } else {
+            setLinesError('Sem conexão e sem catálogo salvo para esta cidade.');
+          }
         }
       } finally {
         if (isMounted) setLoadingLines(false);
@@ -212,15 +226,20 @@ export default function App() {
     });
   };
 
-  // Filtragem rápida em memória (categoria + busca)
+  const stopSearchIndex = useMemo(
+    () => buildStopSearchIndex(detailsStore, savedStops),
+    [detailsStore, savedStops]
+  );
+
+  // Filtragem rápida em memória (categoria + busca em código, nome, operadora e paradas salvas)
   const filteredLines = useMemo(
-    () => filterLines(lines, { filter: activeFilter, searchTerm, favorites }),
-    [lines, searchTerm, activeFilter, favorites]
+    () => filterLines(lines, { filter: activeFilter, searchTerm, favorites, stopSearchIndex }),
+    [lines, searchTerm, activeFilter, favorites, stopSearchIndex]
   );
 
   const filterCounts = useMemo(
-    () => countByFilter(lines, { searchTerm, favorites }),
-    [lines, searchTerm, favorites]
+    () => countByFilter(lines, { searchTerm, favorites, stopSearchIndex }),
+    [lines, searchTerm, favorites, stopSearchIndex]
   );
 
   const showOnlyFavorites = activeFilter === 'favorites';
@@ -434,6 +453,7 @@ export default function App() {
           onStartAlight={handleStartAlight}
           alightStopId={alight?.stop.stopId}
           cityId={currentCity?.cityId || 35}
+          onDetailsCached={setDetailsStore}
           onClose={() => setSelectedLine(null)}
           onOpenMap={(details, selectedStop, activeLine) => {
             setMapData({ line: activeLine || selectedLine, details, selectedStop });

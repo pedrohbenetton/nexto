@@ -1,3 +1,5 @@
+import { normalizeFold } from './offlineCatalogCore.js';
+
 // Filtros de categoria da lista de linhas (pills do topo)
 export const LINE_FILTERS = [
   { id: 'all', label: 'Todos' },
@@ -36,19 +38,24 @@ export function matchesFilter(line, filter, favorites) {
   }
 }
 
-export function matchesSearch(line, searchTerm) {
-  const term = searchTerm.toLowerCase().trim();
+export function matchesSearch(line, searchTerm, stopSearchIndex = null) {
+  const term = normalizeFold(searchTerm);
   if (!term) return true;
-  return [line.routeCode, line.routeMnemonic, line.serviceMnemonic, line.companyName]
-    .some(field => field && String(field).toLowerCase().includes(term));
+  const inFields = [line.routeCode, line.routeMnemonic, line.serviceMnemonic, line.companyName]
+    .some(field => field && normalizeFold(field).includes(term));
+  if (inFields) return true;
+  if (stopSearchIndex && line.lineRoutesPath && stopSearchIndex[line.lineRoutesPath]) {
+    return stopSearchIndex[line.lineRoutesPath].includes(term);
+  }
+  return false;
 }
 
-export function filterLines(lines, { filter, searchTerm, favorites }) {
-  return lines.filter(l => matchesFilter(l, filter, favorites) && matchesSearch(l, searchTerm));
+export function filterLines(lines, { filter, searchTerm, favorites, stopSearchIndex }) {
+  return lines.filter(l => matchesFilter(l, filter, favorites) && matchesSearch(l, searchTerm, stopSearchIndex));
 }
 
-export function countByFilter(lines, { searchTerm, favorites }) {
-  const searched = lines.filter(l => matchesSearch(l, searchTerm));
+export function countByFilter(lines, { searchTerm, favorites, stopSearchIndex }) {
+  const searched = lines.filter(l => matchesSearch(l, searchTerm, stopSearchIndex));
   return Object.fromEntries(
     LINE_FILTERS.map(f => [f.id, searched.filter(l => matchesFilter(l, f.id, favorites)).length])
   );

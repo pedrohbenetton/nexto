@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { PUBLIC_WEB_URL, buildShareUrl, buildShareMessage, shareTrip } from '../utils/shareTrip';
 import { findInitialStop } from '../utils/tripPlanCore';
+import { saveLineDetails, loadLineDetails } from '../utils/offlineCatalog';
+import { partitionScheduledDepartures } from '../utils/offlineCatalogCore';
 import { transitAlarm } from '../utils/audioAlert';
 import { tapFeedback } from '../utils/haptics';
 import { isStopSaved, toSavedStop } from '../utils/savedStops';
@@ -17,12 +19,13 @@ import IssueReports from './IssueReports';
 
 export default function LineDetailDrawer({
   line, onClose, onOpenMap, cityId = 35, initialStopId, initialStopName, savedStops = [], onToggleSavedStop,
-  onStartAlight, alightStopId
+  onStartAlight, alightStopId, onDetailsCached
 }) {
   const [activeLine, setActiveLine] = useState(line);
   const [pairedLines, setPairedLines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState(null);
+  const [offlineMode, setOfflineMode] = useState(false);
   const [selectedStop, setSelectedStop] = useState(null);
   const [predictions, setPredictions] = useState(null);
   const [predLoading, setPredLoading] = useState(false);
@@ -63,21 +66,36 @@ export default function LineDetailDrawer({
       if (!activeLine?.lineRoutesPath) return;
       setLoading(true);
       setError(null);
+      setOfflineMode(false);
+
+      const applyDetails = (det, isOffline) => {
+        setDetails(det);
+        setOfflineMode(isOffline);
+        if (det.stops && det.stops.length > 0) {
+          setSelectedStop(findInitialStop(det.stops, { stopId: initialStopId, stopName: initialStopName }));
+        }
+      };
+
       try {
         const res = await fetch(apiUrl(`/api/lines/details?path=${encodeURIComponent(activeLine.lineRoutesPath)}`));
         const json = await res.json();
         if (isMounted) {
           if (json.success && json.data) {
-            setDetails(json.data);
-            if (json.data.stops && json.data.stops.length > 0) {
-              setSelectedStop(findInitialStop(json.data.stops, { stopId: initialStopId, stopName: initialStopName }));
-            }
+            applyDetails(json.data, false);
+            const nextStore = saveLineDetails(activeLine.lineRoutesPath, json.data);
+            if (onDetailsCached) onDetailsCached(nextStore);
           } else {
-            setError('Falha ao sincronizar o itinerário da linha.');
+            const cached = loadLineDetails(activeLine.lineRoutesPath);
+            if (cached) applyDetails(cached, true);
+            else setError('Não foi possível carregar o itinerário desta linha.');
           }
         }
-      } catch (err) {
-        if (isMounted) setError(err.message);
+      } catch {
+        if (isMounted) {
+          const cached = loadLineDetails(activeLine.lineRoutesPath);
+          if (cached) applyDetails(cached, true);
+          else setError('Sem conexão e sem itinerário salvo para esta linha.');
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -249,11 +267,15 @@ export default function LineDetailDrawer({
         {/* Telemetry Status Bar */}
         <div className="px-5 py-2.5 bg-surface-2 border-b border-line flex items-center justify-between text-xs text-muted">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-brand"></span>
-            <span>TELEMETRIA: <strong className="text-ink">AO VIVO</strong></span>
-            {lastUpdated && (
+            <span className={`w-2 h-2 rounded-full ${offlineMode ? 'bg-warn' : 'bg-brand'}`} />
+            {offlineMode ? (
+              <span className="text-warn font-semibold">Modo offline · itinerário e horários salvos</span>
+            ) : (
+              <span>Previsões <strong className="text-ink">ao vivo</strong></span>
+            )}
+            {lastUpdated && !offlineMode && (
               <span className="text-faint hidden sm:inline">
-                [{lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
+                ({lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})
               </span>
             )}
           </div>
@@ -513,24 +535,41 @@ export default function LineDetailDrawer({
                   <IssueReports subjectId={`stop-${selectedStop.stopId}`} types={['unsafe_night']} />
 
                   {/* Grade de Partidas */}
-                  {selectedStop.departures && selectedStop.departures.length > 0 && (
-                    <div className="pt-2 border-t border-line">
-                      <p className="text-xs font-semibold text-muted mb-1.5 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-accent" />
-                        <span>Partidas Programadas Hoje ({selectedStop.departures.length})</span>
-                      </p>
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1">
-                        {selectedStop.departures.map((t, idx) => (
-                          <span 
-                            key={idx}
-                            className="px-2 py-0.5 rounded-[8px] bg-surface border border-line text-ink text-xs font-medium"
-                          >
-                            {t}
-                          </span>
-                        ))}
+                  {selectedStop.departures && selectedStop.departures.length > 0 && (() => {
+                    const sched = partitionScheduledDepartures(selectedStop.departures);
+                    return (
+                      <div className="pt-2 border-t border-line">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <p className="text-xs font-semibold text-muted flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-accent" />
+                            <span>Partidas Programadas Hoje ({selectedStop.departures.length})</span>
+                          </p>
+                          {sched.nextDeparture && (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-brand-soft text-accent">
+                              Próxima: {sched.nextDeparture}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1">
+                          {selectedStop.departures.map((t, idx) => {
+                            const isNext = t === sched.nextDeparture;
+                            return (
+                              <span
+                                key={idx}
+                                className={`px-2 py-0.5 rounded-[8px] border text-xs ${
+                                  isNext
+                                    ? 'bg-brand border-brand text-on-brand font-bold'
+                                    : 'bg-surface border-line text-ink font-medium'
+                                }`}
+                              >
+                                {t}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
 

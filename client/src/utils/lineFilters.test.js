@@ -56,11 +56,15 @@ describe('matchesSearch', () => {
     assert.equal(matchesSearch(BRT, '   '), true);
   });
 
-  test('busca em código, nomes e operadora', () => {
+  test('busca em código, nomes e operadora (ignorando acentos) e paradas indexadas', () => {
     assert.equal(matchesSearch(TO_CENTRO, '80'), true);
     assert.equal(matchesSearch(TO_CENTRO, 'ufscar'), true);
     assert.equal(matchesSearch(TO_CENTRO, 'consórcio'), true);
+    assert.equal(matchesSearch(TO_CENTRO, 'consorcio'), true);
     assert.equal(matchesSearch(TO_CENTRO, 'eden'), false);
+
+    const stopIdx = { 'p-80': 'avenida doutor armando pannunzio shopping' };
+    assert.equal(matchesSearch({ ...TO_CENTRO, lineRoutesPath: 'p-80' }, 'pannunzio', stopIdx), true);
   });
 });
 
